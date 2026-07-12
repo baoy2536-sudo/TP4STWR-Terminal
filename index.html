@@ -1,0 +1,1788 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ledger &amp; Edge — Trading Journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  :root{
+    --bg:#050810; --bgVia:#070B18;
+    --surface: rgba(20,28,50,0.5); --surface2: rgba(24,33,60,0.55);
+    --glassBorder: rgba(255,255,255,0.08); --glassBorderStrong: rgba(255,255,255,0.14);
+    --border:#25304C; --borderSoft: rgba(255,255,255,0.06);
+    --text:#EDF0F8; --muted:#8791AC; --mutedDim:#4E5872;
+    --mint:#3BAFCE; --mintDeep:#0B1B3D; --mintDim:rgba(59,175,206,0.14);
+    --coral:#FF6E62; --coralDeep:#E8483C; --coralDim:rgba(255,110,98,0.12);
+    --amber:#F0B23E;
+    --violet:#2F6FED; --cyanGlow:#37D3E0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(1100px 620px at 10% -10%, rgba(47,111,237,0.32), transparent 62%),
+      radial-gradient(950px 560px at 105% 0%, rgba(55,211,224,0.26), transparent 60%),
+      radial-gradient(800px 550px at 50% 115%, rgba(37,150,220,0.12), transparent 60%),
+      linear-gradient(180deg, var(--bg), var(--bgVia) 40%, var(--bg));
+    background-attachment: fixed;
+  }
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--glassBorderStrong);border-radius:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::placeholder{color:var(--mutedDim);}
+  button{font-family:'Inter',sans-serif;}
+
+  /* glassmorphism surfaces */
+  .glass{
+    position:relative;
+    background: linear-gradient(155deg, rgba(47,111,237,0.12), rgba(55,211,224,0.06) 55%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid var(--glassBorder);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .glass::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:1px;
+    background: linear-gradient(90deg, rgba(47,111,237,0.9), rgba(55,211,224,0.9), rgba(72,190,235,0.9));
+    opacity:0.55;
+  }
+  .glass-soft{
+    background: linear-gradient(155deg, rgba(47,111,237,0.08), rgba(55,211,224,0.05));
+    border: 1px solid var(--glassBorder);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border-radius: 12px;
+  }
+
+  /* inputs — thin border, glow on focus */
+  .field-input{
+    width:100%; background: rgba(8,12,24,0.5); border:1px solid var(--glassBorder);
+    border-radius:10px; padding:10px 12px; color:var(--text); font-size:14px;
+    font-family:'Inter',sans-serif; transition: box-shadow .18s ease, border-color .18s ease, background .18s ease;
+  }
+  .field-input:focus{
+    outline:none; border-color: var(--cyanGlow); background: rgba(8,12,24,0.65);
+    box-shadow: 0 0 0 3px rgba(55,211,224,0.16), 0 0 18px rgba(55,211,224,0.4);
+  }
+
+  /* toggle buttons (direction / result) */
+  .toggle-btn{
+    flex:1; padding:9px 0; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600;
+    background: rgba(255,255,255,0.03); border:1px solid var(--glassBorder); color:var(--muted);
+    transition: all .16s ease;
+  }
+  .toggle-btn.on-mint{ color:#EAFAFF; background:linear-gradient(135deg, var(--mint), var(--mintDeep));
+    border-color: transparent; box-shadow: 0 0 20px rgba(59,175,206,0.45), inset 0 1px 0 rgba(255,255,255,0.25); }
+  .toggle-btn.on-coral{ color:#1A0503; background:linear-gradient(135deg, var(--coral), var(--coralDeep));
+    border-color: transparent; box-shadow: 0 0 20px rgba(255,110,98,0.45), inset 0 1px 0 rgba(255,255,255,0.25); }
+  .toggle-btn.on-amber{ color:#1C1204; background:linear-gradient(135deg, #F5C567, var(--amber));
+    border-color: transparent; box-shadow: 0 0 20px rgba(240,178,62,0.4), inset 0 1px 0 rgba(255,255,255,0.25); }
+
+  /* primary glowing action button */
+  .btn-primary{
+    width:100%; padding:12px 0; border-radius:12px; border:none; cursor:pointer;
+    font-weight:700; font-size:14.5px; color:#06121F;
+    background: linear-gradient(135deg, var(--cyanGlow), var(--violet));
+    box-shadow: 0 0 26px rgba(55,211,224,0.4), 0 8px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.3);
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .btn-primary:hover{ transform: translateY(-1px); box-shadow: 0 0 34px rgba(55,211,224,0.55), 0 10px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .btn-primary:active{ transform: translateY(0); }
+  .btn-primary:disabled{ opacity:0.4; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  .chip-btn{
+    display:flex; align-items:center; gap:5px; border-radius:9px; padding:7px 12px; font-size:12.5px;
+    cursor:pointer; background: rgba(255,255,255,0.04); border:1px solid var(--glassBorder); color:var(--text);
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .chip-btn:hover{ background: rgba(255,255,255,0.08); }
+  .chip-btn.danger{ color: var(--coral); border-color: rgba(255,110,98,0.35); background: rgba(255,110,98,0.06); }
+  .chip-btn.danger:hover{ background: rgba(255,110,98,0.14); }
+
+  /* tabs */
+  .tab-btn{
+    display:flex; align-items:center; gap:6px; padding:10px 16px; cursor:pointer; font-size:13.5px; font-weight:500;
+    color:var(--muted); background:transparent; border:1px solid transparent; border-radius:10px 10px 0 0;
+    margin-bottom:-1px; position:relative; top:1px; transition: color .15s ease, background .15s ease;
+  }
+  .tab-btn.active{
+    color:var(--text); background: rgba(255,255,255,0.05);
+    border-color: var(--glassBorder); border-bottom-color: transparent;
+    box-shadow: 0 -8px 24px -8px rgba(55,211,224,0.35);
+  }
+  .tab-btn:not(.active):hover{ color:var(--text); }
+
+  .image-slot-empty{
+    width:100%; height:110px; border-radius:12px; border:1px dashed var(--glassBorderStrong);
+    background: rgba(255,255,255,0.02); color:var(--muted); cursor:pointer; display:flex;
+    flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:12px;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .image-slot-empty:hover{ background: rgba(255,255,255,0.05); border-color: var(--cyanGlow); }
+
+  .trade-row{ transition: background .15s ease; }
+  .trade-row:hover{ background: rgba(255,255,255,0.03); }
+
+  .icon-badge{
+    width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg, rgba(47,111,237,0.32), rgba(55,211,224,0.20));
+    border: 1px solid rgba(255,255,255,0.1); flex-shrink:0;
+  }
+
+  .hero-globe-wrap{
+    position:absolute; right:-30px; top:-36px; width:380px; height:210px;
+    pointer-events:none;
+    -webkit-mask-image: linear-gradient(to left, black 30%, transparent 92%);
+    mask-image: linear-gradient(to left, black 30%, transparent 92%);
+  }
+  @media (max-width: 760px){ .hero-globe-wrap{ display:none; } }
+  @media (max-width: 620px){ .stat-row{ grid-template-columns: repeat(2, 1fr) !important; } }
+  @media (max-width: 640px){ .compliance-row{ grid-template-columns: 1fr !important; } }
+  @media (min-width: 1300px){ .quad-grid{ grid-template-columns: repeat(4, 1fr) !important; } }
+  @media (max-width: 700px){ .quad-grid{ grid-template-columns: 1fr !important; } }
+
+  /* market session ticker */
+  .ticker-bar{
+    position:relative; overflow:hidden; white-space:nowrap;
+    background: linear-gradient(90deg, #04060c, #060a16 45%, #04060c);
+    border-bottom: 1px solid rgba(55,211,224,0.25);
+    box-shadow: inset 0 -1px 0 rgba(55,211,224,0.1), 0 2px 16px rgba(0,0,0,0.5);
+  }
+  .ticker-bar::before, .ticker-bar::after{
+    content:""; position:absolute; top:0; bottom:0; width:36px; z-index:2; pointer-events:none;
+  }
+  .ticker-bar::before{ left:0; background:linear-gradient(90deg, #04060c, transparent); }
+  .ticker-bar::after{ right:0; background:linear-gradient(270deg, #04060c, transparent); }
+  .ticker-track{
+    display:inline-flex; align-items:center; gap:0;
+    animation: ticker-scroll 34s linear infinite;
+    will-change: transform;
+  }
+  .ticker-bar:hover .ticker-track{ animation-play-state: paused; }
+  @keyframes ticker-scroll{
+    from{ transform: translateX(0); }
+    to{ transform: translateX(-50%); }
+  }
+  .ticker-item{
+    display:inline-flex; align-items:center; gap:8px; padding:6px 26px;
+    font-family:'JetBrains Mono', monospace; font-size:11.5px; letter-spacing:0.06em;
+    color: rgba(237,240,248,0.75); border-right:1px solid rgba(255,255,255,0.08);
+  }
+  .ticker-dot{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .ticker-dot.live{ background:#3EE8AE; box-shadow:0 0 6px #3EE8AE, 0 0 2px #3EE8AE; animation: ticker-pulse 1.6s ease-in-out infinite; }
+  .ticker-dot.off{ background:#4E5872; }
+  @keyframes ticker-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
+  .ticker-sess{ color:#EDF0F8; font-weight:700; }
+  .ticker-status-live{ color:#3EE8AE; }
+  .ticker-status-off{ color:#8791AC; }
+  @media (prefers-reduced-motion: reduce){ .ticker-track{ animation:none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+const C = {
+  bg:"#050810", surface:"rgba(20,28,50,0.5)", surface2:"rgba(24,33,60,0.55)", border:"rgba(255,255,255,0.08)", borderSoft:"rgba(255,255,255,0.06)",
+  text:"#EDF0F8", muted:"#8791AC", mutedDim:"#4E5872",
+  mint:"#3BAFCE", mintDim:"rgba(59,175,206,0.14)", coral:"#FF6E62", coralDim:"rgba(255,110,98,0.12)", amber:"#F0B23E",
+  blue:"#2F6FED", cyan:"#37D3E0",
+  // institutional donut/bar palette — neon cyan against dark navy, muted brick instead of flashy red
+  cyanNeon:"#3BAFCE", navyDeep:"#0B1B3D", navyDeeper:"#040A1C",
+  brick:"#B08078", brickDeep:"#6B4038", brickDark:"#2E1C18",
+};
+
+// ---------- tiny icon set (no external icon library needed) ----------
+function Icon({ children, size = 16, color = "currentColor", style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, ...style }}>
+      {children}
+    </svg>
+  );
+}
+const Icons = {
+  BookOpen: (p) => <Icon {...p}><path d="M2 4h7a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 4h-7a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h8z"/></Icon>,
+  Activity: (p) => <Icon {...p}><polyline points="3 12 8 12 11 4 14 20 17 12 21 12"/></Icon>,
+  TrendingUp: (p) => <Icon {...p}><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></Icon>,
+  TrendingDown: (p) => <Icon {...p}><polyline points="3 7 9 13 13 9 21 18"/><polyline points="15 18 21 18 21 12"/></Icon>,
+  Camera: (p) => <Icon {...p}><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.5"/></Icon>,
+  Trash2: (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V6h10z"/></Icon>,
+  Edit3: (p) => <Icon {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></Icon>,
+  X: (p) => <Icon {...p}><path d="M18 6 6 18"/><path d="M6 6l12 12"/></Icon>,
+  Plus: (p) => <Icon {...p}><path d="M12 5v14"/><path d="M5 12h14"/></Icon>,
+  ChevronRight: (p) => <Icon {...p}><polyline points="9 18 15 12 9 6"/></Icon>,
+  AlertCircle: (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></Icon>,
+  AlertTriangle: (p) => <Icon {...p}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></Icon>,
+  Download: (p) => <Icon {...p}><path d="M12 3v12"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></Icon>,
+  Upload: (p) => <Icon {...p}><path d="M12 21V9"/><polyline points="7 13 12 8 17 13"/><path d="M5 3h14"/></Icon>,
+  Settings: (p) => <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></Icon>,
+  Lock: (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>,
+  Wallet: (p) => <Icon {...p}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></Icon>,
+};
+
+// ---------- decorative rotating wireframe globe (hero graphic) ----------
+function projectPoint(theta, phi, R, tilt, rot, focal, cx, cy) {
+  const x = R * Math.cos(phi) * Math.cos(theta);
+  const y = R * Math.sin(phi);
+  const z = R * Math.cos(phi) * Math.sin(theta);
+  const y1 = y * Math.cos(tilt) - z * Math.sin(tilt);
+  const z1 = y * Math.sin(tilt) + z * Math.cos(tilt);
+  const x2 = x * Math.cos(rot) + z1 * Math.sin(rot);
+  const z2 = -x * Math.sin(rot) + z1 * Math.cos(rot);
+  const y2 = y1;
+  const scale = focal / (focal + z2);
+  const depth = (z2 + R) / (2 * R);
+  return { x: cx + x2 * scale, y: cy + y2 * scale, depth };
+}
+
+function GlobeCanvas({ width = 380, height = 210 }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    const cx = width * 0.62, cy = height * 0.54;
+    const R = Math.min(width, height) * 0.36;
+    const focal = 340;
+    const tilt = 0.36;
+    const meridians = 10, phiSteps = 16;
+    const latitudes = 6, thetaSteps = 26;
+
+    const stars = Array.from({ length: 22 }, () => ({
+      x: Math.random() * width, y: Math.random() * height,
+      r: 0.6 + Math.random() * 1.1, speed: 0.5 + Math.random() * 1.2, seed: Math.random() * 10,
+    }));
+
+    // small glowing data-points that orbit the globe at varying radii/inclinations — reads as "live data", adds depth
+    const orbiters = Array.from({ length: 7 }, (_, i) => ({
+      incl: (Math.random() - 0.5) * 1.4,
+      radiusMul: 1.12 + Math.random() * 0.22,
+      speed: 0.22 + Math.random() * 0.3,
+      phase: Math.random() * Math.PI * 2,
+      size: 1.3 + Math.random() * 1.4,
+    }));
+
+    let raf;
+    function frame(t) {
+      const time = t * 0.001;
+      const rot = time * 0.18;
+      ctx.clearRect(0, 0, width, height);
+
+      [{ rx: width * 0.62, ry: height * 0.4, deg: -16, base: 0.5 },
+       { rx: width * 0.46, ry: height * 0.52, deg: 14, base: 0.3 }].forEach((o) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate((o.deg * Math.PI) / 180);
+        const grad = ctx.createLinearGradient(-o.rx, 0, o.rx, 0);
+        grad.addColorStop(0, "rgba(59,175,206,0)");
+        grad.addColorStop(0.65, `rgba(59,175,206,${o.base * 0.5})`);
+        grad.addColorStop(1, `rgba(120,205,225,${o.base})`);
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, o.rx, o.ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // --- solid shaded sphere body (gives real volume before the wireframe is drawn on top) ---
+      const lightAngle = 0.9; // light source direction, fixed relative to viewer for a stable "lit side"
+      const lx = cx + Math.cos(lightAngle) * R * 0.55, ly = cy - R * 0.5 + Math.sin(lightAngle) * R * 0.2;
+      const sphereGrad = ctx.createRadialGradient(lx, ly, R * 0.05, cx, cy, R * 1.05);
+      sphereGrad.addColorStop(0, "rgba(150,220,240,0.42)");
+      sphereGrad.addColorStop(0.35, "rgba(59,175,206,0.30)");
+      sphereGrad.addColorStop(0.7, "rgba(18,45,85,0.24)");
+      sphereGrad.addColorStop(1, "rgba(4,10,28,0.05)");
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.fillStyle = sphereGrad;
+      ctx.fill();
+
+      // rim / atmosphere glow
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, R * 1.03, 0, Math.PI * 2);
+      ctx.lineWidth = R * 0.16;
+      ctx.strokeStyle = "rgba(59,175,206,0.24)";
+      ctx.filter = "blur(4px)";
+      ctx.stroke();
+      ctx.restore();
+
+      for (let m = 0; m < meridians; m++) {
+        const theta = (m / meridians) * Math.PI * 2;
+        let prev = null;
+        for (let p = 0; p <= phiSteps; p++) {
+          const phi = -Math.PI / 2 + (p / phiSteps) * Math.PI;
+          const pt = projectPoint(theta, phi, R, tilt, rot, focal, cx, cy);
+          if (prev) {
+            const d = (pt.depth + prev.depth) / 2;
+            ctx.strokeStyle = `rgba(70,165,195,${0.06 + d * 0.5})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(pt.x, pt.y); ctx.stroke();
+          }
+          prev = pt;
+        }
+      }
+      for (let l = 1; l < latitudes; l++) {
+        const phi = -Math.PI / 2 + (l / latitudes) * Math.PI;
+        let prev = null;
+        for (let s = 0; s <= thetaSteps; s++) {
+          const theta = (s / thetaSteps) * Math.PI * 2;
+          const pt = projectPoint(theta, phi, R, tilt, rot, focal, cx, cy);
+          if (prev) {
+            const d = (pt.depth + prev.depth) / 2;
+            ctx.strokeStyle = `rgba(70,165,195,${0.06 + d * 0.5})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(pt.x, pt.y); ctx.stroke();
+          }
+          prev = pt;
+        }
+      }
+
+      // specular highlight (small bright hotspot, gives it a glassy/lit look)
+      ctx.beginPath();
+      const specGrad = ctx.createRadialGradient(lx, ly, 0, lx, ly, R * 0.4);
+      specGrad.addColorStop(0, "rgba(255,255,255,0.35)");
+      specGrad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = specGrad;
+      ctx.arc(lx, ly, R * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // orbiting data points — small satellites tracing tilted rings around the globe
+      orbiters.forEach((o) => {
+        const a = time * o.speed + o.phase;
+        const rr = R * o.radiusMul;
+        const ox = Math.cos(a) * rr;
+        const oy = Math.sin(a) * rr * Math.sin(o.incl + tilt);
+        const oz = Math.sin(a) * rr * Math.cos(o.incl + tilt);
+        const scale = focal / (focal + oz);
+        const depth = (oz + rr) / (2 * rr);
+        const px = cx + ox * scale, py = cy + oy * scale;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(140,220,240,${0.25 + depth * 0.6})`;
+        ctx.arc(px, py, o.size * (0.6 + depth * 0.6), 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      stars.forEach((s) => {
+        const tw = 0.5 + 0.5 * Math.sin(time * s.speed + s.seed);
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255,255,255,${0.25 + tw * 0.55})`;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      raf = requestAnimationFrame(frame);
+    }
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [width, height]);
+
+  return <canvas ref={ref} style={{ display: "block" }} />;
+}
+
+// ---------- live scrolling market-session ticker ----------
+const MARKET_SESSIONS = [
+  { name: "SYDNEY", openUTC: 22, closeUTC: 7 },
+  { name: "TOKYO", openUTC: 0, closeUTC: 9 },
+  { name: "LONDON", openUTC: 8, closeUTC: 17 },
+  { name: "NEW YORK", openUTC: 13, closeUTC: 22 },
+];
+function isSessionOpen(sess, utcHour) {
+  if (sess.openUTC < sess.closeUTC) return utcHour >= sess.openUTC && utcHour < sess.closeUTC;
+  return utcHour >= sess.openUTC || utcHour < sess.closeUTC; // wraps past midnight UTC
+}
+function MarketTicker() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const utcHour = now.getUTCHours();
+  const items = MARKET_SESSIONS.map(s => ({ ...s, open: isSessionOpen(s, utcHour) }));
+  const utcLabel = `${String(utcHour).padStart(2,"0")}:${String(now.getUTCMinutes()).padStart(2,"0")} UTC`;
+  const renderItems = (keyPrefix) => items.map((s, i) => (
+    <span className="ticker-item" key={`${keyPrefix}-${s.name}`}>
+      <span className={`ticker-dot ${s.open ? "live" : "off"}`} />
+      <span className="ticker-sess">{s.name}</span>
+      <span className={s.open ? "ticker-status-live" : "ticker-status-off"}>{s.open ? "OPEN" : "CLOSED"}</span>
+    </span>
+  ));
+  return (
+    <div className="ticker-bar">
+      <div className="ticker-track">
+        {renderItems("a")}
+        <span className="ticker-item"><span className="ticker-sess" style={{ color:C.cyan }}>MARKET CLOCK</span>&nbsp;{utcLabel}</span>
+        {renderItems("b")}
+        <span className="ticker-item"><span className="ticker-sess" style={{ color:C.cyan }}>MARKET CLOCK</span>&nbsp;{utcLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+const SESSIONS = ["Asia", "London", "New York", "Overlap"];
+const EMOTIONS = ["สงบ/มั่นใจ", "กลัว", "โลภ", "FOMO", "แค้น (Revenge)", "ลังเล", "เบื่อ/เฉื่อยชา"];
+const SETUP_SUGGESTIONS = ["Breakout", "Pullback", "Trend Following", "Reversal", "Range/Mean Reversion", "News Trade", "Liquidity Sweep"];
+const SYMBOL_SUGGESTIONS = [
+  "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD",
+  "EURJPY", "GBPJPY", "EURGBP", "AUDJPY",
+  "XAUUSD", "XAGUSD", "USOIL",
+  "BTCUSD", "ETHUSD",
+  "US30", "US100", "US500", "GER40", "JPN225",
+];
+const CHECKLIST_ITEMS = [
+  { key: "plan", label: "เข้าตามแผนที่วางไว้ล่วงหน้า" },
+  { key: "sl", label: "ตั้ง Stop Loss ชัดเจนก่อนเข้า" },
+  { key: "size", label: "ขนาด Position ตรงกับ % ความเสี่ยงที่กำหนด" },
+  { key: "matchesSetup", label: "ตรงตามเงื่อนไข Setup ที่กำหนดไว้จริง" },
+  { key: "noImpulse", label: "ไม่ได้เข้าเพราะ FOMO / แค้น / หุนหันพลันแล่น" },
+];
+const WEEKDAYS_TH = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
+const initialForm = {
+  datetime: "", symbol: "", direction: "Long", setup: "", session: "Asia",
+  reason: "", emotion: EMOTIONS[0], result: "Win", rMultiple: "", notes: "",
+  riskPercent: "", checklist: { plan: false, sl: false, size: false, matchesSetup: false, noImpulse: false },
+  newsDuringTrade: "No", slippageR: "", durationMinutes: "",
+  lotSize: "", slPips: "", pointValue: "",
+};
+
+// ---------- rough point-value estimates (USD per 1 pip/point, per 1.00 standard lot) ----------
+// Broker contract specs vary — these are common defaults meant for journal estimates only.
+function guessPointValue(symbol) {
+  const s = (symbol || "").toUpperCase();
+  if (!s) return "";
+  if (s.includes("XAU")) return 1;      // gold: 100oz/lot, 0.01 move ≈ $1
+  if (s.includes("XAG")) return 50;     // silver: 5000oz/lot, 0.01 move ≈ $50
+  if (s.includes("OIL") || s.includes("WTI") || s.includes("BRENT")) return 10;
+  if (s.includes("BTC")) return 1;
+  if (s.includes("ETH")) return 1;
+  if (["US30","US100","US500","GER40","JPN225","UK100"].some(idx => s.includes(idx))) return 1;
+  if (s.includes("JPY")) return 7;      // JPY-quoted pairs, rough USD approximation
+  if (/^[A-Z]{6}$/.test(s)) return 10;  // standard 6-letter forex pair, 100k/lot, 0.0001 move ≈ $10
+  return "";
+}
+
+const initialSettings = {
+  startingBalance: "10000",
+  currency: "บาท",
+  defaultRiskPercent: "1",
+  dailyLossLimitPercent: "3",
+  maxTradesPerDay: "3",
+  lockEnabled: true,
+};
+
+function guessSession(dt) {
+  if (!dt) return "Asia";
+  const h = new Date(dt).getHours();
+  if (h >= 6 && h < 13) return "Asia";
+  if (h >= 13 && h < 16) return "Overlap";
+  if (h >= 16 && h < 21) return "London";
+  return "New York";
+}
+
+function nowLocalDatetime() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function wilsonLowerBound(wins, n, z = 1.44) {
+  if (n === 0) return 0;
+  const phat = wins / n;
+  const denom = 1 + (z * z) / n;
+  const center = phat + (z * z) / (2 * n);
+  const margin = z * Math.sqrt((phat * (1 - phat)) / n + (z * z) / (4 * n * n));
+  return Math.max(0, (center - margin) / denom);
+}
+
+function mean(arr) { return arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0; }
+function stdDev(arr) {
+  if (arr.length < 2) return 0;
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
+}
+function holdTypeOf(mins) {
+  if (mins === undefined || mins === null || mins === "" || Number.isNaN(mins)) return null;
+  const m = parseFloat(mins);
+  if (m < 15) return "Scalp";
+  if (m <= 240) return "Intraday";
+  return "Swing";
+}
+
+function resizeImage(file, maxW = 640, quality = 0.55) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function fmt(n, d = 2) {
+  if (n === undefined || n === null || Number.isNaN(n)) return "—";
+  return n.toFixed(d);
+}
+function fmtMoney(n, currency) {
+  if (n === undefined || n === null || Number.isNaN(n)) return "—";
+  const s = n.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return `${s} ${currency || ""}`.trim();
+}
+function resultColor(result) {
+  if (result === "Win") return C.mint;
+  if (result === "Loss") return C.coral;
+  return C.amber;
+}
+function todayStr() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+// ---------- local persistence (plain localStorage — this file runs standalone) ----------
+const store = {
+  get(key) {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch (e) { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+  },
+  remove(key) { try { localStorage.removeItem(key); } catch (e) {} },
+};
+
+// ---------- ui atoms ----------
+function Field({ label, children, span }) {
+  return (
+    <div style={{ gridColumn: span ? "span 2" : undefined }}>
+      <div style={{ fontSize: 11, letterSpacing: "0.06em", color: C.muted, marginBottom: 6, textTransform: "uppercase" }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+const inputStyle = { width: "100%", background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", color: C.text, fontSize: 14 };
+
+let ringIdCounter = 0;
+function ScoreDial({ score, size = 56 }) {
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = ringIdCounter++;
+  const uid = idRef.current;
+  const color = score >= 65 ? C.cyanNeon : score >= 45 ? C.amber : C.brick;
+  const colorDeep = score >= 65 ? C.navyDeep : score >= 45 ? "#C98A1E" : C.brickDeep;
+  const r = size / 2 - 5;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  return (
+    <svg width={size} height={size} style={{ display: "block", overflow: "visible" }}>
+      <defs>
+        <linearGradient id={`sd-grad-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={color} />
+          <stop offset="100%" stopColor={colorDeep} />
+        </linearGradient>
+        <filter id={`sd-glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3.2" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      <circle cx={size/2} cy={size/2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth="5" fill="none" />
+      <circle cx={size/2} cy={size/2} r={r} stroke={`url(#sd-grad-${uid})`} strokeWidth="5" fill="none"
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`} filter={`url(#sd-glow-${uid})`} />
+      <text x="50%" y="52%" textAnchor="middle" dominantBaseline="middle"
+        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: size*0.3, fill: C.text, fontWeight: 600 }}>{score}</text>
+    </svg>
+  );
+}
+
+// ---------- glowing radial ring for category win-rate breakdowns ----------
+function GlowRing({ value, label, sub, size = 92 }) {
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = ringIdCounter++;
+  const uid = idRef.current;
+  const v = Math.max(0, Math.min(100, value));
+  const good = v >= 50;
+  const color = good ? C.cyanNeon : C.brick;
+  const colorDeep = good ? C.navyDeep : C.brickDeep;
+  const colorDark = good ? C.navyDeeper : C.brickDark;
+  const r = size/2 - 9;
+  const ry = r * 0.86;             // vertical squash → reads as a tilted disc, not a flat circle
+  const depth = size * 0.05;       // extrusion thickness
+  const cx = size/2, cy = size/2 - depth*0.3;
+  const circ = 2 * Math.PI * r;    // dash math still uses the true radius so % lines up
+  const offset = circ - (v/100) * circ;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8, minWidth:size }}>
+      <svg width={size} height={size+depth} style={{ overflow:"visible" }}>
+        <defs>
+          <linearGradient id={`gr-grad-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={color} />
+            <stop offset="100%" stopColor={colorDeep} />
+          </linearGradient>
+          <linearGradient id={`gr-edge-${uid}`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={colorDeep} />
+            <stop offset="100%" stopColor={colorDark} />
+          </linearGradient>
+          <filter id={`gr-glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="4.5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id={`gr-shadow-${uid}`} x="-60%" y="-60%" width="220%" height="240%">
+            <feGaussianBlur stdDeviation="3.5" />
+          </filter>
+        </defs>
+
+        {/* grounding shadow */}
+        <ellipse cx={cx} cy={cy + depth*1.6} rx={r*0.92} ry={ry*0.5} fill="rgba(0,0,0,0.45)" filter={`url(#gr-shadow-${uid})`} />
+
+        {/* extruded underside — stacked slices give the ring physical thickness */}
+        {Array.from({ length: 5 }).map((_,i) => (
+          <ellipse key={i} cx={cx} cy={cy + i*0.9} rx={r} ry={ry} stroke={`url(#gr-edge-${uid})`} strokeWidth="8" fill="none"
+            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+            transform={`rotate(-90 ${cx} ${cy + i*0.9})`} opacity={0.55} />
+        ))}
+
+        {/* base track (unfilled portion) */}
+        <ellipse cx={cx} cy={cy} rx={r} ry={ry} stroke="rgba(255,255,255,0.06)" strokeWidth="8" fill="none" />
+
+        {/* top face — the glossy, glowing progress ring */}
+        <ellipse cx={cx} cy={cy} rx={r} ry={ry} stroke={`url(#gr-grad-${uid})`} strokeWidth="8" fill="none"
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`} filter={`url(#gr-glow-${uid})`} />
+
+        {/* specular highlight arc across the top of the ring for a glassy sheen */}
+        <ellipse cx={cx} cy={cy} rx={r*0.98} ry={ry*0.98} stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" fill="none"
+          strokeDasharray={`${circ*0.16} ${circ}`} strokeDashoffset={circ*0.02} strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`} />
+
+        <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle"
+          style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:size*0.2, fontWeight:700, fill:C.text }}>{fmt(v,0)}%</text>
+      </svg>
+      <div style={{ fontSize:12.5, fontWeight:600, color:C.text, textAlign:"center" }}>{label}</div>
+      {sub && <div style={{ fontSize:10, color:C.muted, textAlign:"center" }}>{sub}</div>}
+    </div>
+  );
+}
+function RadialStatGrid({ data, valueKey = "winRate", labelKey = "name" }) {
+  if (!data.length) return null;
+  return (
+    <div style={{ display:"flex", flexWrap:"wrap", gap:"20px 26px", justifyContent:"flex-start" }}>
+      {data.map((d) => (
+        <GlowRing key={d[labelKey]} value={d[valueKey]} label={d[labelKey]}
+          sub={`n=${d.n} · Exp ${d.expectancy>=0?"+":""}${fmt(d.expectancy,2)}R`} />
+      ))}
+    </div>
+  );
+}
+
+// ---------- big hero compliance gauge (discipline score) ----------
+function ComplianceGauge({ value, count, size = 220 }) {
+  const idRef = useRef(null);
+  if (idRef.current === null) idRef.current = ringIdCounter++;
+  const uid = idRef.current;
+  const cx = size/2, cy = size/2;
+  const rOuter = size/2 - 6;
+  const rArc = size/2 - 20;
+  const hasData = value !== null && value !== undefined;
+  const v = hasData ? Math.max(0, Math.min(100, value)) : 0;
+  const circ = 2 * Math.PI * rArc;
+  const offset = circ - (v/100) * circ;
+  const dashCount = 46;
+  const label = hasData ? (v>=80 ? "DISCIPLINED" : v>=50 ? "OK COMPLIANCE" : "NEEDS WORK") : "NO DATA YET";
+  const labelColor = hasData ? (v>=80?C.mint:v>=50?C.amber:C.coral) : C.muted;
+
+  // small callout lines toward top-left / top-right corners
+  const p1 = { x: cx - rOuter*0.68, y: cy - rOuter*0.78 };
+  const p2 = { x: cx + rOuter*0.68, y: cy - rOuter*0.78 };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+      <svg width={size} height={size + 14} style={{ overflow:"visible" }}>
+        <defs>
+          <linearGradient id={`cg-arc-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={C.coral} />
+            <stop offset="45%" stopColor={C.violet} />
+            <stop offset="100%" stopColor={C.cyan} />
+          </linearGradient>
+          <filter id={`cg-glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* callout lines */}
+        <line x1={p1.x} y1={p1.y} x2={18} y2={16} stroke={C.coral} strokeWidth="1" opacity="0.55" />
+        <line x1={18} y1={16} x2={40} y2={16} stroke={C.coral} strokeWidth="1" opacity="0.55" />
+        <text x={4} y={12} fontSize="9" fill={C.coral} opacity="0.8" letterSpacing="0.05em">PLAN</text>
+
+        <line x1={p2.x} y1={p2.y} x2={size-18} y2={16} stroke={C.cyan} strokeWidth="1" opacity="0.55" />
+        <line x1={size-40} y1={16} x2={size-18} y2={16} stroke={C.cyan} strokeWidth="1" opacity="0.55" />
+        <text x={size-42} y={12} fontSize="9" fill={C.cyan} opacity="0.8" letterSpacing="0.05em" textAnchor="end">RISK</text>
+
+        {/* dashed decorative outer ring */}
+        {Array.from({ length: dashCount }).map((_, i) => {
+          const a = (i / dashCount) * Math.PI * 2;
+          const x1 = cx + Math.cos(a) * (rOuter-3), y1 = cy + Math.sin(a) * (rOuter-3);
+          const x2 = cx + Math.cos(a) * rOuter, y2 = cy + Math.sin(a) * rOuter;
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(255,255,255,0.18)" strokeWidth="1.4" />;
+        })}
+
+        {/* base ring */}
+        <circle cx={cx} cy={cy} r={rArc} stroke="rgba(255,255,255,0.06)" strokeWidth="12" fill="none" />
+        {/* progress arc */}
+        <circle cx={cx} cy={cy} r={rArc} stroke={hasData ? `url(#cg-arc-${uid})` : "rgba(255,255,255,0.1)"} strokeWidth="12" fill="none"
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`} filter={hasData ? `url(#cg-glow-${uid})` : undefined} />
+
+        <text x={cx} y={cy-6} textAnchor="middle" style={{ fontFamily:"'Fraunces', serif", fontSize:size*0.19, fontWeight:700, fill:C.text }}>
+          {hasData ? `${fmt(v,0)}%` : "—"}
+        </text>
+        <text x={cx} y={cy+20} textAnchor="middle" style={{ fontFamily:"'Inter', sans-serif", fontSize:11, fontWeight:600, letterSpacing:"0.08em", fill:labelColor }}>
+          {label}
+        </text>
+      </svg>
+      <div style={{ fontSize:11.5, color:C.muted, marginTop:2, textAlign:"center" }}>
+        {hasData ? `Discipline Score จาก ${count} ไม้ที่มีเช็คลิสต์` : "ยังไม่มีข้อมูลเช็คลิสต์"}
+      </div>
+    </div>
+  );
+}
+
+// ---------- lightweight SVG charts (no chart library dependency) ----------
+function EquityCurveChart({ data, width = 640, height = 200, moneyMode = false, currency = "" }) {
+  if (!data.length) return null;
+  const pad = { l: 44, r: 10, t: 10, b: 22 };
+  const w = width - pad.l - pad.r, h = height - pad.t - pad.b;
+  const xs = (i) => pad.l + (data.length === 1 ? w/2 : (i/(data.length-1))*w);
+  const key = moneyMode ? "balance" : "equity";
+  const values = data.map(d => d[key]);
+  const baseline = moneyMode ? (data[0].balance - (data[0].pnl || 0)) : 0;
+  const min = Math.min(baseline, ...values), max = Math.max(baseline, ...values);
+  const range = (max - min) || 1;
+  const ys = (v) => pad.t + h - ((v - min)/range)*h;
+  const zeroY = ys(baseline);
+  const linePoints = data.map((d,i) => `${xs(i)},${ys(d[key])}`).join(" ");
+  const areaPoints = `${xs(0)},${zeroY} ${linePoints} ${xs(data.length-1)},${zeroY}`;
+  return (
+    <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display:"block", overflow:"visible" }}>
+      <defs>
+        <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={C.mint} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={C.mint} stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="eqLineGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={C.cyan} />
+          <stop offset="100%" stopColor={C.mint} />
+        </linearGradient>
+        <filter id="eq-glow" x="-30%" y="-60%" width="160%" height="220%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      {[0,0.25,0.5,0.75,1].map((t,i) => (
+        <line key={i} x1={pad.l} x2={width-pad.r} y1={pad.t+h*t} y2={pad.t+h*t} stroke={C.borderSoft} strokeWidth="1" />
+      ))}
+      <line x1={pad.l} x2={width-pad.r} y1={zeroY} y2={zeroY} stroke={C.border} strokeWidth="1" />
+      <polygon points={areaPoints} fill="url(#eqGrad)" />
+      <polyline points={linePoints} fill="none" stroke="url(#eqLineGrad)" strokeWidth="2.5" filter="url(#eq-glow)" />
+      <text x={pad.l} y={height-4} fontSize="10" fill={C.muted}>1</text>
+      <text x={width-pad.r} y={height-4} fontSize="10" fill={C.muted} textAnchor="end">{data.length}</text>
+      <text x={2} y={pad.t+8} fontSize="10" fill={C.muted}>{moneyMode ? fmt(max,0) : fmt(max,1)}</text>
+      <text x={2} y={pad.t+h} fontSize="10" fill={C.muted}>{moneyMode ? fmt(min,0) : fmt(min,1)}</text>
+    </svg>
+  );
+}
+
+function SimpleBarChart({ data, valueKey, labelKey, colorFn, width = 300, height = 180, suffix = "" }) {
+  if (!data.length) return null;
+  const pad = { l: 26, r: 18, t: 16, b: 34 };
+  const w = width - pad.l - pad.r, h = height - pad.t - pad.b;
+  const max = Math.max(1, ...data.map(d => d[valueKey]));
+  const bw = w / data.length;
+  const depth = Math.min(9, bw * 0.22); // isometric extrusion depth, scales down for narrow bars
+  return (
+    <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display:"block", overflow:"visible" }}>
+      <defs>
+        <linearGradient id="bar-grad-mint" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#8FD3E8" />
+          <stop offset="100%" stopColor="#1E7A94" />
+        </linearGradient>
+        <linearGradient id="bar-grad-coral" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#C9A29B" />
+          <stop offset="100%" stopColor="#7A4E46" />
+        </linearGradient>
+        <filter id="bar-glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <filter id="bar-shadow" x="-60%" y="-60%" width="220%" height="240%">
+          <feGaussianBlur stdDeviation="2.5" />
+        </filter>
+      </defs>
+      {[0,0.5,1].map((t,i) => <line key={i} x1={pad.l} x2={width-pad.r} y1={pad.t+h*(1-t)} y2={pad.t+h*(1-t)} stroke={C.borderSoft} strokeWidth="1" />)}
+      {data.map((d,i) => {
+        const val = d[valueKey];
+        const barH = Math.max(1, (val/max)*h);
+        const x = pad.l + i*bw + bw*0.15;
+        const bwv = bw*0.6;
+        const y = pad.t + h - barH;
+        const tone = colorFn ? colorFn(d) : C.cyanNeon;
+        const isCoral = tone === C.brick || tone === C.coral;
+        const fillUrl = isCoral ? "url(#bar-grad-coral)" : "url(#bar-grad-mint)";
+        const topFace = isCoral ? "#D9BBB5" : "#BEE4EE";
+        const sideFace = isCoral ? "#4A2F29" : "#123F4C";
+        const baseline = pad.t + h;
+        return (
+          <g key={i}>
+            {/* grounding shadow */}
+            <ellipse cx={x+bwv/2+depth/2} cy={baseline+2.5} rx={bwv/2+depth*0.6} ry={3} fill="rgba(0,0,0,0.35)" filter="url(#bar-shadow)" />
+
+            <g filter="url(#bar-glow)">
+              {/* side face (right) — darker, gives the block its shadowed flank */}
+              <polygon points={`${x+bwv},${y} ${x+bwv+depth},${y-depth} ${x+bwv+depth},${baseline-depth} ${x+bwv},${baseline}`} fill={sideFace} opacity="0.9" />
+              {/* front face */}
+              <rect x={x} y={y} width={bwv} height={barH} fill={fillUrl} rx="3" />
+              {/* top face (parallelogram) — lighter, catches the "light from above" */}
+              <polygon points={`${x},${y} ${x+bwv},${y} ${x+bwv+depth},${y-depth} ${x+depth},${y-depth}`} fill={topFace} opacity="0.95" />
+            </g>
+
+            <text x={x+bwv/2+depth/2} y={pad.t+h+16} fontSize="9" fill={C.muted} textAnchor="middle">{d[labelKey]}</text>
+            <text x={x+bwv/2+depth/2} y={y-depth-6} fontSize="9.5" fill={C.text} textAnchor="middle" fontFamily="'JetBrains Mono', monospace">{fmt(val,0)}{suffix}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ---------- rolling win rate line chart (0-100 range, 50% reference line) ----------
+function RollingLineChart({ data, width = 640, height = 170, refLine = 50, suffix = "%" }) {
+  if (!data.length) return null;
+  const pad = { l: 30, r: 10, t: 10, b: 20 };
+  const w = width - pad.l - pad.r, h = height - pad.t - pad.b;
+  const xs = (i) => pad.l + (data.length === 1 ? w/2 : (i/(data.length-1))*w);
+  const ys = (v) => pad.t + h - (Math.max(0, Math.min(100, v))/100)*h;
+  const linePoints = data.map((d,i) => `${xs(i)},${ys(d.value)}`).join(" ");
+  const refY = ys(refLine);
+  return (
+    <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display:"block", overflow:"visible" }}>
+      <defs>
+        <linearGradient id="rollGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={C.blue} />
+          <stop offset="100%" stopColor={C.cyan} />
+        </linearGradient>
+        <filter id="roll-glow" x="-30%" y="-60%" width="160%" height="220%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+      </defs>
+      {[0,50,100].map((t,i) => <line key={i} x1={pad.l} x2={width-pad.r} y1={ys(t)} y2={ys(t)} stroke={C.borderSoft} strokeWidth="1" />)}
+      <line x1={pad.l} x2={width-pad.r} y1={refY} y2={refY} stroke={C.amber} strokeDasharray="4 3" strokeWidth="1" opacity="0.6" />
+      <polyline points={linePoints} fill="none" stroke="url(#rollGrad)" strokeWidth="2.5" filter="url(#roll-glow)" />
+      <text x={2} y={pad.t+6} fontSize="10" fill={C.muted}>100{suffix}</text>
+      <text x={2} y={pad.t+h} fontSize="10" fill={C.muted}>0{suffix}</text>
+      <text x={width-pad.r} y={refY-4} fontSize="9" fill={C.amber} textAnchor="end">50{suffix}</text>
+    </svg>
+  );
+}
+
+// ---------- calendar heatmap (daily R sum) ----------
+function CalendarHeatmap({ data }) {
+  if (!data.length) return null;
+  const maxAbs = Math.max(1, ...data.map(d => Math.abs(d.r)));
+  const months = {};
+  data.forEach(d => {
+    const m = d.date.slice(0,7);
+    (months[m] = months[m] || []).push(d);
+  });
+  const monthKeys = Object.keys(months).sort();
+  function cellColor(r) {
+    if (r === 0) return "rgba(255,255,255,0.05)";
+    const t = Math.min(1, Math.abs(r)/maxAbs);
+    return r > 0 ? `rgba(62,232,174,${0.15+t*0.65})` : `rgba(255,110,98,${0.15+t*0.65})`;
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+      {monthKeys.map(m => (
+        <div key={m}>
+          <div style={{ fontSize:10.5, color:C.muted, marginBottom:5, fontFamily:"'JetBrains Mono', monospace" }}>{m}</div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
+            {months[m].map(d => (
+              <div key={d.date} title={`${d.date}: ${d.r>=0?"+":""}${d.r.toFixed(2)}R`}
+                style={{ width:16, height:16, borderRadius:4, background:cellColor(d.r), border:"1px solid rgba(255,255,255,0.06)" }} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------- settings modal (account balance + daily risk limits) ----------
+function SettingsModal({ settings, onSave, onClose }) {
+  const [local, setLocal] = useState(settings);
+  function upd(k, v) { setLocal(s => ({ ...s, [k]: v })); }
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"#000000cc", display:"flex", alignItems:"center", justifyContent:"center", zIndex:60, padding:20 }}>
+      <div onClick={(e)=>e.stopPropagation()} className="glass" style={{ padding:22, width:"min(480px, 100%)", maxHeight:"90vh", overflowY:"auto" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
+          <div style={{ fontFamily:"'Fraunces', serif", fontSize:18, display:"flex", alignItems:"center", gap:8 }}>
+            <Icons.Settings size={17}/> ตั้งค่าพอร์ต &amp; วินัยความเสี่ยง
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", display:"flex" }}><Icons.X size={18}/></button>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          <Field label="ยอดพอร์ตเริ่มต้น">
+            <input type="number" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }}
+              value={local.startingBalance} onChange={(e)=>upd("startingBalance", e.target.value)} />
+          </Field>
+          <Field label="สกุลเงิน / หน่วย">
+            <input className="field-input" placeholder="บาท, USD, ฯลฯ" value={local.currency} onChange={(e)=>upd("currency", e.target.value)} />
+          </Field>
+          <Field label="ความเสี่ยงต่อไม้เริ่มต้น % (ใช้เมื่อไม้นั้นไม่ได้กรอกไว้)">
+            <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }}
+              value={local.defaultRiskPercent} onChange={(e)=>upd("defaultRiskPercent", e.target.value)} />
+          </Field>
+          <div style={{ height:1, background:C.borderSoft, margin:"4px 0" }} />
+          <div style={{ fontSize:12, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>Daily Loss Limit</div>
+          <Field label="ขาดทุนสูงสุดที่ยอมรับได้ต่อวัน (% ของพอร์ต)">
+            <input type="number" step="0.5" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }}
+              value={local.dailyLossLimitPercent} onChange={(e)=>upd("dailyLossLimitPercent", e.target.value)} />
+          </Field>
+          <Field label="จำนวนไม้สูงสุดต่อวัน">
+            <input type="number" step="1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }}
+              value={local.maxTradesPerDay} onChange={(e)=>upd("maxTradesPerDay", e.target.value)} />
+          </Field>
+          <label style={{ display:"flex", alignItems:"center", gap:10, fontSize:13, cursor:"pointer", marginTop:2 }}>
+            <input type="checkbox" checked={local.lockEnabled} onChange={(e)=>upd("lockEnabled", e.target.checked)} style={{ width:16, height:16, accentColor:C.cyan }} />
+            ล็อกการบันทึกไม้ใหม่อัตโนมัติเมื่อชนลิมิต (ต้องติ๊กยืนยันถึงจะฝืนบันทึกได้)
+          </label>
+        </div>
+        <button onClick={()=>onSave(local)} className="btn-primary" style={{ marginTop:20 }}>บันทึกการตั้งค่า</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- daily limit warning banner ----------
+function LimitBanner({ limitInfo, overrideChecked, setOverrideChecked }) {
+  if (!limitInfo || !limitInfo.breached) return null;
+  return (
+    <div className="glass" style={{ padding:16, marginBottom:18, border:`1px solid rgba(255,110,98,0.4)`, background:"linear-gradient(155deg, rgba(255,110,98,0.14), rgba(255,110,98,0.04))" }}>
+      <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+        <div style={{ color:C.coral, flexShrink:0, marginTop:2 }}><Icons.AlertTriangle size={20}/></div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:700, fontSize:14.5, color:C.coral, display:"flex", alignItems:"center", gap:6 }}>
+            <Icons.Lock size={14}/> ถึงลิมิตความเสี่ยงวันนี้แล้ว
+          </div>
+          <div style={{ fontSize:13, color:C.text, marginTop:6, lineHeight:1.6 }}>
+            {limitInfo.reasons.map((r,i) => <div key={i}>• {r}</div>)}
+          </div>
+          <div style={{ fontSize:12.5, color:C.muted, marginTop:8 }}>
+            แนะนำให้หยุดเทรดวันนี้ พักแล้วกลับมาใหม่พรุ่งนี้ตามระบบ ไม่ใช่ฝืนเพื่อ "เอาคืน"
+          </div>
+          <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:12.5, marginTop:12, cursor:"pointer", color:C.text }}>
+            <input type="checkbox" checked={overrideChecked} onChange={(e)=>setOverrideChecked(e.target.checked)} style={{ width:15, height:15, accentColor:C.coral }} />
+            ฉันเข้าใจความเสี่ยง และยืนยันจะบันทึกไม้เพิ่มวันนี้ต่อ
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- main app ----------
+function App() {
+  const [trades, setTrades] = useState([]);
+  const [tab, setTab] = useState("log");
+  const [form, setForm] = useState(() => {
+    const n = nowLocalDatetime();
+    return { ...initialForm, datetime: n, session: guessSession(n) };
+  });
+  const [editingId, setEditingId] = useState(null);
+  const [imgBefore, setImgBefore] = useState(null);
+  const [imgAfter, setImgAfter] = useState(null);
+  const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(null);
+  const [lightbox, setLightbox] = useState(null);
+  const [settings, setSettings] = useState(initialSettings);
+  const [showSettings, setShowSettings] = useState(false);
+  const [overrideChecked, setOverrideChecked] = useState(false);
+  const importRef = useRef(null);
+
+  useEffect(() => { loadTrades(); loadSettings(); }, []);
+
+  function loadTrades() {
+    const ids = store.get("lm-trade-ids") || [];
+    const list = [];
+    ids.forEach((id) => { const t = store.get(`lm-trade:${id}`); if (t) list.push(t); });
+    list.sort((a,b) => new Date(b.datetime) - new Date(a.datetime));
+    setTrades(list);
+  }
+
+  function loadSettings() {
+    const s = store.get("lm-settings");
+    if (s) setSettings({ ...initialSettings, ...s });
+  }
+  function saveSettings(s) {
+    setSettings(s);
+    store.set("lm-settings", s);
+    setShowSettings(false);
+  }
+
+  function resetForm() {
+    const n = nowLocalDatetime();
+    setForm({ ...initialForm, datetime: n, session: guessSession(n) });
+    setImgBefore(null); setImgAfter(null); setEditingId(null); setError("");
+    setOverrideChecked(false);
+  }
+
+  async function handleImage(e, which) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const dataUrl = await resizeImage(file);
+    if (which === "before") setImgBefore(dataUrl); else setImgAfter(dataUrl);
+  }
+
+  // ---- money/equity calculation (chronological compounding using per-trade or default risk %) ----
+  const moneyStats = useMemo(() => {
+    const startingBalance = parseFloat(settings.startingBalance) || 0;
+    const defaultRisk = parseFloat(settings.defaultRiskPercent) || 0;
+    const chron = [...trades].sort((a,b) => new Date(a.datetime) - new Date(b.datetime));
+    let balance = startingBalance;
+    const points = chron.map((t, i) => {
+      const riskPct = parseFloat(t.riskPercent) || defaultRisk || 0;
+      const dollarRisk = balance * (riskPct / 100);
+      const pnl = dollarRisk * (t.rMultiple || 0);
+      balance += pnl;
+      return { idx: i+1, balance: parseFloat(balance.toFixed(2)), pnl: parseFloat(pnl.toFixed(2)), date: t.datetime ? t.datetime.slice(0,10) : null, id: t.id };
+    });
+    const currentBalance = points.length ? points[points.length-1].balance : startingBalance;
+    const totalPnl = currentBalance - startingBalance;
+    // today's stats
+    const today = todayStr();
+    const todaysPoints = points.filter(p => p.date === today);
+    const todaysPnl = todaysPoints.reduce((s,p) => s+p.pnl, 0);
+    const balanceBeforeToday = todaysPoints.length ? (todaysPoints[0].balance - todaysPoints[0].pnl) : currentBalance;
+    const todaysPnlPercent = balanceBeforeToday ? (todaysPnl / balanceBeforeToday) * 100 : 0;
+    const todaysTradeCount = todaysPoints.length;
+    return { startingBalance, currentBalance, totalPnl, points, todaysPnl, todaysPnlPercent, todaysTradeCount };
+  }, [trades, settings]);
+
+  const limitInfo = useMemo(() => {
+    if (!settings.lockEnabled) return { breached: false, reasons: [] };
+    const lossLimitPct = parseFloat(settings.dailyLossLimitPercent) || 0;
+    const maxTrades = parseInt(settings.maxTradesPerDay) || 0;
+    const reasons = [];
+    if (lossLimitPct > 0 && moneyStats.todaysPnlPercent <= -lossLimitPct) {
+      reasons.push(`ขาดทุนวันนี้ ${fmt(Math.abs(moneyStats.todaysPnlPercent),1)}% ถึงลิมิต ${fmt(lossLimitPct,1)}% แล้ว`);
+    }
+    if (maxTrades > 0 && moneyStats.todaysTradeCount >= maxTrades) {
+      reasons.push(`เทรดไปแล้ว ${moneyStats.todaysTradeCount} ไม้วันนี้ ถึงลิมิต ${maxTrades} ไม้/วันแล้ว`);
+    }
+    return { breached: reasons.length > 0, reasons };
+  }, [settings, moneyStats]);
+
+  const isLocked = limitInfo.breached && !overrideChecked && !editingId;
+
+  function saveTrade() {
+    if (!form.symbol.trim() || !form.datetime || form.rMultiple === "") {
+      setError("กรอกให้ครบ: สัญลักษณ์, วันที่/เวลา และ R-Multiple");
+      return;
+    }
+    if (isLocked) {
+      setError("ถึงลิมิตความเสี่ยงวันนี้แล้ว กรุณาติ๊กยืนยันด้านบนก่อนบันทึกไม้เพิ่ม");
+      return;
+    }
+    setError("");
+    const id = editingId || `t${Date.now()}`;
+    const tradeObj = { ...form, id, symbol: form.symbol.trim().toUpperCase(), rMultiple: parseFloat(form.rMultiple), imgBefore: imgBefore || null, imgAfter: imgAfter || null };
+    const ok = store.set(`lm-trade:${id}`, tradeObj);
+    if (!ok) { setError("บันทึกไม่สำเร็จ รูปอาจใหญ่เกินไปสำหรับพื้นที่เก็บของเบราว์เซอร์ ลองใช้รูปที่เล็กลง"); return; }
+    if (!editingId) {
+      const ids = store.get("lm-trade-ids") || [];
+      ids.push(id);
+      store.set("lm-trade-ids", ids);
+    }
+    loadTrades();
+    resetForm();
+    setTab("list");
+  }
+
+  function deleteTrade(id) {
+    store.remove(`lm-trade:${id}`);
+    const ids = (store.get("lm-trade-ids") || []).filter(x => x !== id);
+    store.set("lm-trade-ids", ids);
+    loadTrades();
+  }
+
+  function editTrade(t) {
+    setForm({ ...initialForm, ...t, rMultiple: String(t.rMultiple) });
+    setImgBefore(t.imgBefore || null);
+    setImgAfter(t.imgAfter || null);
+    setEditingId(t.id);
+    setTab("log");
+  }
+
+  function exportData() {
+    const blob = new Blob([JSON.stringify(trades, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `trading-journal-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const arr = JSON.parse(ev.target.result);
+        if (!Array.isArray(arr)) throw new Error("bad format");
+        const ids = store.get("lm-trade-ids") || [];
+        arr.forEach((t) => {
+          if (!t.id) t.id = `t${Date.now()}${Math.random().toString(36).slice(2,6)}`;
+          store.set(`lm-trade:${t.id}`, t);
+          if (!ids.includes(t.id)) ids.push(t.id);
+        });
+        store.set("lm-trade-ids", ids);
+        loadTrades();
+      } catch (err) { alert("ไฟล์ไม่ถูกต้อง"); }
+    };
+    reader.readAsText(file);
+  }
+
+  const stats = useMemo(() => {
+    if (trades.length === 0) return null;
+    const chron = [...trades].sort((a,b) => new Date(a.datetime) - new Date(b.datetime));
+    const wins = trades.filter(t => t.result === "Win").length;
+    const losses = trades.filter(t => t.result === "Loss").length;
+    const be = trades.filter(t => t.result === "BE").length;
+    const total = trades.length;
+    const winRate = (wins+losses) ? (wins/(wins+losses))*100 : 0;
+    const allR = trades.map(t => t.rMultiple);
+    const avgR = mean(allR);
+    const avgWinR = wins ? trades.filter(t=>t.result==="Win").reduce((s,t)=>s+t.rMultiple,0)/wins : 0;
+    const avgLossR = losses ? trades.filter(t=>t.result==="Loss").reduce((s,t)=>s+t.rMultiple,0)/losses : 0;
+
+    let running=0, peak=0, maxDD=0;
+    const equity = chron.map((t,i) => {
+      running += t.rMultiple;
+      peak = Math.max(peak, running);
+      maxDD = Math.max(maxDD, peak-running);
+      return { idx: i+1, equity: parseFloat(running.toFixed(2)) };
+    });
+
+    function groupByFn(keyFn) {
+      const map = {};
+      trades.forEach(t => { const k = keyFn(t) || "ไม่ระบุ"; (map[k]=map[k]||[]).push(t); });
+      return Object.entries(map).map(([name,arr]) => {
+        const n = arr.length;
+        const w = arr.filter(x=>x.result==="Win").length;
+        const l = arr.filter(x=>x.result==="Loss").length;
+        const wr = (w+l) ? (w/(w+l))*100 : 0;
+        const expectancy = arr.reduce((s,x)=>s+x.rMultiple,0)/n;
+        const score = Math.round(wilsonLowerBound(w,w+l)*100);
+        return { name, n, winRate: wr, expectancy, score };
+      }).sort((a,b) => b.score-a.score);
+    }
+    const groupBy = (key) => groupByFn(t => (t[key]||"ไม่ระบุ").trim() || "ไม่ระบุ");
+
+    const buckets = [
+      { label:"<-2R", min:-Infinity, max:-2, count:0 },
+      { label:"-2~-1R", min:-2, max:-1, count:0 },
+      { label:"-1~0R", min:-1, max:0, count:0 },
+      { label:"0~1R", min:0, max:1, count:0 },
+      { label:"1~2R", min:1, max:2, count:0 },
+      { label:"2~3R", min:2, max:3, count:0 },
+      { label:">3R", min:3, max:Infinity, count:0 },
+    ];
+    trades.forEach(t => { for (const b of buckets) { if (t.rMultiple > b.min && t.rMultiple <= b.max) { b.count++; break; } } });
+
+    // --- institutional metrics ---
+    const grossWin = allR.filter(r => r > 0).reduce((s,r)=>s+r, 0);
+    const grossLoss = Math.abs(allR.filter(r => r < 0).reduce((s,r)=>s+r, 0));
+    const profitFactor = grossLoss > 0 ? grossWin / grossLoss : (grossWin > 0 ? Infinity : 0);
+
+    const sd = stdDev(allR);
+    const sharpe = sd > 0 ? avgR / sd : 0;
+    const downsideDev = Math.sqrt(mean(allR.map(r => Math.min(0, r) ** 2)));
+    const sortino = downsideDev > 0 ? avgR / downsideDev : 0;
+
+    const payoffRatio = avgLossR !== 0 ? Math.abs(avgWinR / avgLossR) : 0;
+    const winFrac = (wins+losses) ? wins/(wins+losses) : 0;
+    const kellyPct = payoffRatio ? (winFrac - (1-winFrac)/payoffRatio) * 100 : 0;
+
+    const withChecklist = trades.filter(t => t.checklist);
+    const disciplineScore = withChecklist.length
+      ? mean(withChecklist.map(t => (Object.values(t.checklist).filter(Boolean).length / CHECKLIST_ITEMS.length) * 100))
+      : null;
+
+    const rollingWindow = Math.min(30, chron.length);
+    const rollingWinRate = chron.map((t, i) => {
+      const start = Math.max(0, i - rollingWindow + 1);
+      const windowArr = chron.slice(start, i+1).filter(x => x.result === "Win" || x.result === "Loss");
+      const w = windowArr.filter(x => x.result === "Win").length;
+      const wr = windowArr.length ? (w/windowArr.length)*100 : 0;
+      return { idx: i+1, value: parseFloat(wr.toFixed(1)) };
+    });
+
+    const weekdayRanking = groupByFn(t => t.datetime ? WEEKDAYS_TH[new Date(t.datetime).getDay()] : null);
+    const hourRanking = groupByFn(t => {
+      if (!t.datetime) return null;
+      const h = new Date(t.datetime).getHours();
+      if (h < 6) return "00-06";
+      if (h < 12) return "06-12";
+      if (h < 18) return "12-18";
+      return "18-24";
+    });
+
+    let maxWinStreak = 0, maxLossStreak = 0, curW = 0, curL = 0;
+    chron.forEach(t => {
+      if (t.result === "Win") { curW++; curL = 0; maxWinStreak = Math.max(maxWinStreak, curW); }
+      else if (t.result === "Loss") { curL++; curW = 0; maxLossStreak = Math.max(maxLossStreak, curL); }
+    });
+
+    const riskVals = trades.map(t => parseFloat(t.riskPercent)).filter(v => !Number.isNaN(v) && v > 0);
+    const avgRiskPercent = riskVals.length ? mean(riskVals) : null;
+    let riskOfRuinPct = null;
+    if (avgRiskPercent) {
+      const edge = 2 * (winRate/100) - 1;
+      const units = 100 / avgRiskPercent;
+      riskOfRuinPct = edge <= 0 ? 100 : Math.min(100, Math.pow((1-edge)/(1+edge), units) * 100);
+    }
+
+    const dayMap = {};
+    chron.forEach(t => {
+      if (!t.datetime) return;
+      const d = t.datetime.slice(0,10);
+      dayMap[d] = (dayMap[d]||0) + t.rMultiple;
+    });
+    const calendarData = Object.entries(dayMap).map(([date, r]) => ({ date, r })).sort((a,b) => a.date.localeCompare(b.date));
+
+    return {
+      wins, losses, be, total, winRate, avgR, avgWinR, avgLossR, equity, maxDD,
+      setupRanking: groupBy("setup"), sessionRanking: groupBy("session"), buckets, chron,
+      profitFactor, sd, sharpe, sortino, kellyPct, disciplineScore, disciplineCount: withChecklist.length,
+      rollingWinRate, rollingWindow, weekdayRanking, hourRanking, maxWinStreak, maxLossStreak,
+      avgRiskPercent, riskOfRuinPct, calendarData,
+    };
+  }, [trades]);
+
+  return (
+    <div style={{ minHeight:"100vh", background:"transparent", color:C.text, fontFamily:"'Inter', sans-serif" }}>
+      <MarketTicker />
+      <div style={{ borderBottom:`1px solid ${C.borderSoft}`, padding:"22px 20px 0", position:"relative", overflow:"hidden",
+        background:"linear-gradient(120deg, rgba(47,111,237,0.24), rgba(55,211,224,0.14) 55%, transparent 90%)" }}>
+        <div className="hero-globe-wrap"><GlobeCanvas width={380} height={210} /></div>
+        <div style={{ maxWidth:"min(1680px, 94vw)", margin:"0 auto", position:"relative" }}>
+          <div style={{ display:"flex", alignItems:"baseline", gap:10, flexWrap:"wrap" }}>
+            <h1 style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:26, margin:0, letterSpacing:"-0.01em" }}>Ledger &amp; Edge</h1>
+            <span style={{ fontSize:12, color:C.muted, fontFamily:"'JetBrains Mono', monospace" }}>trading journal · quant engine</span>
+            <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+              <button onClick={()=>setShowSettings(true)} title="ตั้งค่าพอร์ตและวินัยความเสี่ยง" className="chip-btn">
+                <Icons.Settings size={13}/> ตั้งค่า
+              </button>
+              <button onClick={exportData} title="สำรองข้อมูลเป็นไฟล์ JSON" className="chip-btn">
+                <Icons.Download size={13}/> สำรองข้อมูล
+              </button>
+              <input ref={importRef} type="file" accept="application/json" style={{ display:"none" }} onChange={importData} />
+              <button onClick={()=>importRef.current.click()} title="นำเข้าไฟล์สำรอง" className="chip-btn">
+                <Icons.Upload size={13}/> นำเข้า
+              </button>
+            </div>
+          </div>
+
+          {/* account balance strip */}
+          <div style={{ display:"flex", alignItems:"center", gap:18, marginTop:14, flexWrap:"wrap" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <div className="icon-badge" style={{ width:32, height:32, borderRadius:9 }}><Icons.Wallet size={16} color={C.text}/></div>
+              <div>
+                <div style={{ fontSize:10, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>ยอดพอร์ตปัจจุบัน</div>
+                <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:17, fontWeight:700 }}>{fmtMoney(moneyStats.currentBalance, settings.currency)}</div>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize:10, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>กำไร/ขาดทุนสะสม</div>
+              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:14, fontWeight:600, color: moneyStats.totalPnl>=0?C.mint:C.coral }}>
+                {moneyStats.totalPnl>=0?"+":""}{fmtMoney(moneyStats.totalPnl, settings.currency)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize:10, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>วันนี้</div>
+              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:14, fontWeight:600, color: moneyStats.todaysPnl>=0?C.mint:C.coral }}>
+                {moneyStats.todaysPnl>=0?"+":""}{fmtMoney(moneyStats.todaysPnl, settings.currency)} ({fmt(moneyStats.todaysPnlPercent,1)}%) · {moneyStats.todaysTradeCount} ไม้
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height:1, background:`linear-gradient(90deg, ${C.cyan}aa, transparent 70%)`, marginTop:14, boxShadow:`0 0 8px ${C.cyan}55` }} />
+          <div style={{ display:"flex", gap:4, marginTop:14 }}>
+            {[
+              { k:"log", label:"บันทึกไม้", Icon: Icons.BookOpen },
+              { k:"list", label:`รายการ (${trades.length})`, Icon: Icons.Activity },
+              { k:"quant", label:"Quant Engine", Icon: Icons.TrendingUp },
+            ].map(({k,label,Icon}) => (
+              <button key={k} onClick={()=>setTab(k)} className={`tab-btn ${tab===k ? "active" : ""}`}>
+                <Icon size={15}/> {label}
+                {k==="log" && limitInfo.breached && <Icons.Lock size={12} color={C.coral} style={{ marginLeft:2 }}/>}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:"min(1680px, 94vw)", margin:"0 auto", padding:"24px 20px 60px" }}>
+        {tab === "log" && (
+          <>
+            <LimitBanner limitInfo={limitInfo} overrideChecked={overrideChecked} setOverrideChecked={setOverrideChecked} />
+            <LogForm form={form} setForm={setForm} imgBefore={imgBefore} imgAfter={imgAfter}
+              handleImage={handleImage} setImgBefore={setImgBefore} setImgAfter={setImgAfter}
+              saveTrade={saveTrade} error={error} editingId={editingId} resetForm={resetForm}
+              isLocked={isLocked} currentBalance={moneyStats.currentBalance} currency={settings.currency} />
+          </>
+        )}
+        {tab === "list" && (
+          <TradeList trades={trades} expanded={expanded} setExpanded={setExpanded}
+            editTrade={editTrade} deleteTrade={deleteTrade} setLightbox={setLightbox} setTab={setTab} />
+        )}
+        {tab === "quant" && <QuantEngine stats={stats} moneyStats={moneyStats} settings={settings} />}
+      </div>
+
+      {lightbox && (
+        <div onClick={()=>setLightbox(null)} style={{ position:"fixed", inset:0, background:"#000000dd", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, cursor:"zoom-out", padding:20 }}>
+          <img src={lightbox} style={{ maxWidth:"100%", maxHeight:"100%", borderRadius:8 }} />
+        </div>
+      )}
+      {showSettings && (
+        <SettingsModal settings={settings} onSave={saveSettings} onClose={()=>setShowSettings(false)} />
+      )}
+    </div>
+  );
+}
+
+function LogForm({ form, setForm, imgBefore, imgAfter, handleImage, setImgBefore, setImgAfter, saveTrade, error, editingId, resetForm, isLocked, currentBalance, currency }) {
+  function upd(k,v) { setForm(f => ({ ...f, [k]:v })); }
+
+  function updSymbol(v) {
+    setForm(f => {
+      const next = { ...f, symbol: v };
+      if (!f.pointValue) {
+        const guess = guessPointValue(v);
+        if (guess !== "") next.pointValue = String(guess);
+      }
+      return next;
+    });
+  }
+
+  const lot = parseFloat(form.lotSize);
+  const slPips = parseFloat(form.slPips);
+  const ptVal = parseFloat(form.pointValue);
+  const hasLotCalc = lot > 0 && slPips > 0 && ptVal > 0;
+  const dollarRisk = hasLotCalc ? lot * slPips * ptVal : null;
+  const calcRiskPercent = hasLotCalc && currentBalance > 0 ? (dollarRisk / currentBalance) * 100 : null;
+
+  function applyCalcRisk() {
+    if (calcRiskPercent !== null) upd("riskPercent", calcRiskPercent.toFixed(2));
+  }
+
+  return (
+    <div className="glass" style={{ padding:22 }}>
+      <div style={{ fontFamily:"'Fraunces', serif", fontSize:18, marginBottom:18, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <span>{editingId ? "แก้ไขไม้เทรด" : "บันทึกไม้ใหม่"}</span>
+        {editingId && <button onClick={resetForm} style={{ background:"none", border:"none", color:C.muted, cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", gap:4 }}><Icons.X size={13}/> ยกเลิกแก้ไข</button>}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+        <Field label="วันที่ / เวลาเข้า">
+          <div style={{ display:"flex", gap:8 }}>
+            <input type="datetime-local" className="field-input" value={form.datetime}
+              onChange={(e)=>{ upd("datetime", e.target.value); upd("session", guessSession(e.target.value)); }} />
+            <button type="button" onClick={()=>{ const n = nowLocalDatetime(); upd("datetime", n); upd("session", guessSession(n)); }}
+              className="chip-btn" style={{ flexShrink:0, whiteSpace:"nowrap" }}>ตอนนี้</button>
+          </div>
+        </Field>
+        <Field label="สัญลักษณ์ (Symbol)">
+          <input className="field-input" list="symbol-suggestions" placeholder="EURUSD, XAUUSD, BTCUSD…" value={form.symbol} onChange={(e)=>updSymbol(e.target.value.toUpperCase())} />
+          <datalist id="symbol-suggestions">{SYMBOL_SUGGESTIONS.map(s => <option key={s} value={s} />)}</datalist>
+        </Field>
+        <Field label="ทิศทาง">
+          <div style={{ display:"flex", gap:8 }}>
+            {["Long","Short"].map(d => (
+              <button key={d} onClick={()=>upd("direction", d)}
+                className={`toggle-btn ${form.direction===d ? (d==="Long"?"on-mint":"on-coral") : ""}`}>
+                {d==="Long" ? "Long ▲" : "Short ▼"}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Session">
+          <select className="field-input" value={form.session} onChange={(e)=>upd("session", e.target.value)}>
+            {SESSIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Setup">
+          <input className="field-input" list="setup-suggestions" placeholder="เช่น Breakout, Pullback…" value={form.setup} onChange={(e)=>upd("setup", e.target.value)} />
+          <datalist id="setup-suggestions">{SETUP_SUGGESTIONS.map(s => <option key={s} value={s} />)}</datalist>
+        </Field>
+        <Field label="อารมณ์ขณะเข้าไม้ (ถ้าต้องการ)">
+          <select className="field-input" value={form.emotion} onChange={(e)=>upd("emotion", e.target.value)}>
+            {EMOTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="ผลลัพธ์">
+          <div style={{ display:"flex", gap:8 }}>
+            {["Win","Loss","BE"].map(r => (
+              <button key={r} onClick={()=>upd("result", r)}
+                className={`toggle-btn ${form.result===r ? (r==="Win"?"on-mint":r==="Loss"?"on-coral":"on-amber") : ""}`}>
+                {r}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label="R-Multiple ผลลัพธ์ (เช่น 2 = +2R, -1 = -1R)">
+          <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="0.0" value={form.rMultiple} onChange={(e)=>upd("rMultiple", e.target.value)} />
+        </Field>
+        <Field label="ความเสี่ยงต่อไม้ (% ของพอร์ต)">
+          <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น 1.0" value={form.riskPercent} onChange={(e)=>upd("riskPercent", e.target.value)} />
+        </Field>
+        <Field label="ออก Lot เท่าไหร่">
+          <input type="number" step="0.01" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น 0.01" value={form.lotSize} onChange={(e)=>upd("lotSize", e.target.value)} />
+        </Field>
+        <Field label="Stop Loss ห่างกี่จุด (pips/points)">
+          <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น 20" value={form.slPips} onChange={(e)=>upd("slPips", e.target.value)} />
+        </Field>
+        <Field label="มูลค่าต่อจุด ต่อ 1.00 Lot (ประมาณอัตโนมัติ แก้ไขได้)">
+          <input type="number" step="0.01" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น 10" value={form.pointValue} onChange={(e)=>upd("pointValue", e.target.value)} />
+        </Field>
+        <Field label="ความเสี่ยงที่คำนวณได้ (อัตโนมัติจาก Lot)" span>
+          <div className="glass-soft" style={{ padding:"12px 14px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
+            {hasLotCalc ? (
+              <>
+                <div style={{ fontSize:13 }}>
+                  เสี่ยงประมาณ <b style={{ fontFamily:"'JetBrains Mono', monospace" }}>{fmtMoney(dollarRisk, currency)}</b>
+                  {" "}({fmt(calcRiskPercent,2)}% ของพอร์ต {fmtMoney(currentBalance, currency)})
+                </div>
+                <button type="button" onClick={applyCalcRisk} className="chip-btn">ใช้ค่านี้เติมช่อง % ความเสี่ยง</button>
+              </>
+            ) : (
+              <div style={{ fontSize:12.5, color:C.muted }}>กรอก Lot, จุด SL และมูลค่าต่อจุด ให้ครบ ระบบจะคำนวณ % ความเสี่ยงให้อัตโนมัติ</div>
+            )}
+          </div>
+          <div style={{ fontSize:11, color:C.mutedDim, marginTop:6 }}>* มูลค่าต่อจุดเป็นค่าประมาณตามชนิดสินทรัพย์ทั่วไป ควรเทียบกับสเปกสัญญาจริงของโบรกเกอร์เพื่อความแม่นยำ</div>
+        </Field>
+        <Field label="Slippage (R, ถ้ามี — ราคาจริงเทียบราคาที่ตั้งใจ)">
+          <input type="number" step="0.01" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น -0.1" value={form.slippageR} onChange={(e)=>upd("slippageR", e.target.value)} />
+        </Field>
+        <Field label="ระยะเวลาถือไม้ (นาที)">
+          <input type="number" step="1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น 45" value={form.durationMinutes} onChange={(e)=>upd("durationMinutes", e.target.value)} />
+        </Field>
+        <Field label="มีข่าวสำคัญระหว่างถือไม้ไหม">
+          <div style={{ display:"flex", gap:8 }}>
+            {["No","Yes"].map(v => (
+              <button key={v} onClick={()=>upd("newsDuringTrade", v)}
+                className={`toggle-btn ${form.newsDuringTrade===v ? (v==="Yes"?"on-amber":"on-mint") : ""}`}>
+                {v==="Yes" ? "มีข่าว" : "ไม่มี"}
+              </button>
+            ))}
+          </div>
+        </Field>
+        <Field label="เช็คลิสต์ก่อนเข้า (วัด Discipline Score)" span>
+          <div className="glass-soft" style={{ padding:"10px 12px", display:"flex", flexDirection:"column", gap:8 }}>
+            {CHECKLIST_ITEMS.map(item => (
+              <label key={item.key} style={{ display:"flex", alignItems:"center", gap:10, fontSize:13, cursor:"pointer", color: form.checklist[item.key] ? C.text : C.muted }}>
+                <input type="checkbox" checked={!!form.checklist[item.key]}
+                  onChange={(e)=>upd("checklist", { ...form.checklist, [item.key]: e.target.checked })}
+                  style={{ width:16, height:16, accentColor: C.cyan }} />
+                {item.label}
+              </label>
+            ))}
+          </div>
+        </Field>
+        <Field label="เหตุผลในการเข้าไม้" span>
+          <textarea className="field-input" style={{ minHeight:70, resize:"vertical" }} placeholder="เช่น เบรกแนวรับ retest + volume ยืนยัน…" value={form.reason} onChange={(e)=>upd("reason", e.target.value)} />
+        </Field>
+        <Field label="โน้ตเพิ่มเติม (ถ้ามี)" span>
+          <textarea className="field-input" style={{ minHeight:50, resize:"vertical" }} placeholder="สิ่งที่เรียนรู้ / สิ่งที่ควรทำต่างออกไป…" value={form.notes} onChange={(e)=>upd("notes", e.target.value)} />
+        </Field>
+        <Field label="ภาพก่อนเข้า">
+          <ImageSlot img={imgBefore} onChange={(e)=>handleImage(e,"before")} onClear={()=>setImgBefore(null)} />
+        </Field>
+        <Field label="ภาพหลังออก">
+          <ImageSlot img={imgAfter} onChange={(e)=>handleImage(e,"after")} onClear={()=>setImgAfter(null)} />
+        </Field>
+      </div>
+      {error && <div style={{ color:C.coral, fontSize:13, marginTop:14 }}>{error}</div>}
+      <button onClick={saveTrade} className="btn-primary" style={{ marginTop:18 }} disabled={isLocked}>
+        {isLocked ? <><Icons.Lock size={16}/> ล็อกอยู่ — ติ๊กยืนยันด้านบนก่อน</> : <><Icons.Plus size={16}/> {editingId ? "บันทึกการแก้ไข" : "บันทึกไม้นี้"}</>}
+      </button>
+    </div>
+  );
+}
+
+function ImageSlot({ img, onChange, onClear }) {
+  const ref = useRef(null);
+  return (
+    <div>
+      <input ref={ref} type="file" accept="image/*" style={{ display:"none" }} onChange={onChange} />
+      {img ? (
+        <div style={{ position:"relative" }}>
+          <img src={img} style={{ width:"100%", height:110, objectFit:"cover", borderRadius:8, border:`1px solid ${C.border}` }} />
+          <button onClick={onClear} style={{ position:"absolute", top:6, right:6, background:"#000000aa", border:"none", borderRadius:6, color:"#fff", padding:4, cursor:"pointer", display:"flex" }}><Icons.X size={13}/></button>
+        </div>
+      ) : (
+        <button onClick={()=>ref.current.click()} className="image-slot-empty">
+          <Icons.Camera size={18}/> แนบรูปภาพ
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TradeList({ trades, expanded, setExpanded, editTrade, deleteTrade, setLightbox, setTab }) {
+  if (trades.length === 0) {
+    return (
+      <div style={{ textAlign:"center", padding:"50px 20px", color:C.muted }}>
+        <div style={{ fontFamily:"'Fraunces', serif", fontSize:18, color:C.text, marginBottom:8 }}>ยังไม่มีไม้ในสมุด</div>
+        <div style={{ fontSize:13, marginBottom:18 }}>เริ่มบันทึกไม้แรกเพื่อให้ Quant Engine มีข้อมูลวิเคราะห์</div>
+        <button onClick={()=>setTab("log")} className="btn-primary" style={{ width:"auto", display:"inline-flex", padding:"10px 22px" }}>+ บันทึกไม้แรก</button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+      {trades.map(t => {
+        const isOpen = expanded === t.id;
+        return (
+          <div key={t.id} className="glass trade-row" style={{ borderRadius:14, overflow:"hidden" }}>
+            <div onClick={()=>setExpanded(isOpen ? null : t.id)} style={{ padding:"13px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
+              <div style={{ width:4, height:32, borderRadius:2, background:resultColor(t.result), boxShadow:`0 0 10px ${resultColor(t.result)}88` }} />
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:14, fontWeight:600 }}>
+                  {t.symbol} {t.direction==="Long" ? <Icons.TrendingUp size={14} color={C.mint}/> : <Icons.TrendingDown size={14} color={C.coral}/>}
+                  <span style={{ fontSize:11, color:C.muted, fontWeight:400 }}>{t.setup || "ไม่ระบุ setup"}</span>
+                </div>
+                <div style={{ fontSize:11.5, color:C.muted, marginTop:2, fontFamily:"'JetBrains Mono', monospace" }}>
+                  {t.datetime ? new Date(t.datetime).toLocaleString("th-TH") : "—"} · {t.session}
+                </div>
+              </div>
+              <div style={{ fontFamily:"'JetBrains Mono', monospace", fontWeight:700, color:resultColor(t.result), fontSize:15 }}>
+                {t.rMultiple>0?"+":""}{fmt(t.rMultiple,1)}R
+              </div>
+              <Icons.ChevronRight size={16} color={C.muted} style={{ transform: isOpen?"rotate(90deg)":"none", transition:"transform .15s" }} />
+            </div>
+            {isOpen && (
+              <div style={{ padding:"0 16px 16px", borderTop:`1px solid ${C.borderSoft}` }}>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginTop:14, fontSize:13 }}>
+                  <div><span style={{ color:C.muted }}>อารมณ์: </span>{t.emotion || "—"}</div>
+                  <div><span style={{ color:C.muted }}>ผลลัพธ์: </span>{t.result}</div>
+                  <div><span style={{ color:C.muted }}>ความเสี่ยง: </span>{t.riskPercent ? `${t.riskPercent}%` : "—"}</div>
+                  <div><span style={{ color:C.muted }}>ระยะเวลาถือ: </span>{t.durationMinutes ? `${t.durationMinutes} นาที (${holdTypeOf(t.durationMinutes)})` : "—"}</div>
+                  <div><span style={{ color:C.muted }}>Slippage: </span>{t.slippageR ? `${t.slippageR}R` : "—"}</div>
+                  <div><span style={{ color:C.muted }}>ข่าวระหว่างถือ: </span>{t.newsDuringTrade === "Yes" ? "มี" : "ไม่มี"}</div>
+                  {t.checklist && (
+                    <div style={{ gridColumn:"span 2" }}>
+                      <span style={{ color:C.muted }}>เช็คลิสต์: </span>
+                      {Object.values(t.checklist).filter(Boolean).length}/{CHECKLIST_ITEMS.length}
+                      <span style={{ color: (Object.values(t.checklist).filter(Boolean).length/CHECKLIST_ITEMS.length*100) >= 80 ? C.mint : C.amber, marginLeft:6 }}>
+                        ({fmt(Object.values(t.checklist).filter(Boolean).length/CHECKLIST_ITEMS.length*100, 0)}%)
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {t.reason && <div style={{ marginTop:10, fontSize:13 }}><span style={{ color:C.muted }}>เหตุผลเข้า: </span>{t.reason}</div>}
+                {t.notes && <div style={{ marginTop:6, fontSize:13 }}><span style={{ color:C.muted }}>โน้ต: </span>{t.notes}</div>}
+                {(t.imgBefore || t.imgAfter) && (
+                  <div style={{ display:"flex", gap:10, marginTop:12 }}>
+                    {t.imgBefore && <div style={{ flex:1 }}><div style={{ fontSize:10.5, color:C.muted, marginBottom:4 }}>ก่อนเข้า</div><img src={t.imgBefore} onClick={()=>setLightbox(t.imgBefore)} style={{ width:"100%", height:90, objectFit:"cover", borderRadius:6, cursor:"zoom-in", border:`1px solid ${C.border}` }} /></div>}
+                    {t.imgAfter && <div style={{ flex:1 }}><div style={{ fontSize:10.5, color:C.muted, marginBottom:4 }}>หลังออก</div><img src={t.imgAfter} onClick={()=>setLightbox(t.imgAfter)} style={{ width:"100%", height:90, objectFit:"cover", borderRadius:6, cursor:"zoom-in", border:`1px solid ${C.border}` }} /></div>}
+                  </div>
+                )}
+                <div style={{ display:"flex", gap:8, marginTop:14 }}>
+                  <button onClick={()=>editTrade(t)} className="chip-btn"><Icons.Edit3 size={13}/> แก้ไข</button>
+                  <button onClick={()=>deleteTrade(t.id)} className="chip-btn danger"><Icons.Trash2 size={13}/> ลบ</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function QuantEngine({ stats, moneyStats, settings }) {
+  if (!stats) {
+    return (
+      <div style={{ textAlign:"center", padding:"50px 20px", color:C.muted }}>
+        <div style={{ fontFamily:"'Fraunces', serif", fontSize:18, color:C.text, marginBottom:8 }}>ยังไม่มีข้อมูลให้วิเคราะห์</div>
+        <div style={{ fontSize:13 }}>บันทึกไม้อย่างน้อย 2-3 ไม้ แล้ว Quant Engine จะเริ่มคำนวณสถิติให้</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      <div>
+        <div style={{ fontSize:11, color:C.muted, marginBottom:6, letterSpacing:"0.05em", textTransform:"uppercase" }}>ลำดับไม้ตามเวลา (R-tape)</div>
+        <div className="glass-soft" style={{ display:"flex", alignItems:"flex-end", gap:2, height:40, padding:"6px 8px", overflowX:"auto" }}>
+          {stats.chron.map(t => {
+            const h = Math.min(28, Math.max(4, Math.abs(t.rMultiple)*8));
+            return <div key={t.id} title={`${t.symbol} ${t.rMultiple}R`} style={{ width:5, minWidth:5, height:h, background:resultColor(t.result), borderRadius:1, opacity:0.9, boxShadow:`0 0 6px ${resultColor(t.result)}66` }} />;
+          })}
+        </div>
+      </div>
+
+      <div className="stat-row" style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:10 }}>
+        <StatCard label="Win Rate" value={`${fmt(stats.winRate,1)}%`} color={stats.winRate>=50?C.mint:C.coral} Icon={Icons.TrendingUp} />
+        <StatCard label="Expectancy" value={`${stats.avgR>=0?"+":""}${fmt(stats.avgR,2)}R`} color={stats.avgR>=0?C.mint:C.coral} Icon={Icons.Activity} />
+        <StatCard label="เทรดทั้งหมด" value={`${stats.total}`} color={C.text} sub={`W ${stats.wins} / L ${stats.losses} / BE ${stats.be}`} Icon={Icons.BookOpen} />
+        <StatCard label="Max Drawdown" value={`${fmt(stats.maxDD,2)}R`} color={C.coral} Icon={Icons.TrendingDown} />
+      </div>
+
+      <div className="stat-row" style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:10 }}>
+        <StatCard label="ยอดพอร์ตปัจจุบัน" value={fmtMoney(moneyStats.currentBalance, settings.currency)} color={C.text} Icon={Icons.Wallet}
+          sub={`เริ่มต้น ${fmtMoney(moneyStats.startingBalance, settings.currency)}`} />
+        <StatCard label="กำไร/ขาดทุนสะสม" value={`${moneyStats.totalPnl>=0?"+":""}${fmtMoney(moneyStats.totalPnl, settings.currency)}`}
+          color={moneyStats.totalPnl>=0?C.mint:C.coral} Icon={Icons.TrendingUp} />
+        <StatCard label="วันนี้" value={`${moneyStats.todaysPnl>=0?"+":""}${fmtMoney(moneyStats.todaysPnl, settings.currency)}`}
+          color={moneyStats.todaysPnl>=0?C.mint:C.coral} sub={`${fmt(moneyStats.todaysPnlPercent,1)}% · ${moneyStats.todaysTradeCount} ไม้`} Icon={Icons.Activity} />
+      </div>
+
+      <Panel title="Equity Curve (สะสมเป็น R)">
+        <EquityCurveChart data={stats.equity} />
+      </Panel>
+
+      <Panel title={`Equity Curve (เป็น ${settings.currency || "เงิน"})`}>
+        <EquityCurveChart data={moneyStats.points} moneyMode currency={settings.currency} />
+      </Panel>
+
+      <div className="stat-row" style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:10 }}>
+        <StatCard label="Profit Factor" value={stats.profitFactor===Infinity ? "∞" : fmt(stats.profitFactor,2)} color={stats.profitFactor>=1.5?C.mint:stats.profitFactor>=1?C.amber:C.coral} Icon={Icons.Activity} />
+        <StatCard label="Std. Deviation (R)" value={fmt(stats.sd,2)} color={C.text} sub="ยิ่งต่ำ ยิ่งนิ่ง/คาดเดาได้" Icon={Icons.Activity} />
+        <StatCard label="Sharpe (ต่อไม้)" value={fmt(stats.sharpe,2)} color={stats.sharpe>=0.3?C.mint:C.amber} Icon={Icons.TrendingUp} />
+        <StatCard label="Sortino (ต่อไม้)" value={fmt(stats.sortino,2)} color={stats.sortino>=0.3?C.mint:C.amber} Icon={Icons.TrendingUp} />
+        <StatCard label="Kelly Criterion" value={`${stats.kellyPct>=0?"+":""}${fmt(stats.kellyPct,1)}%`} color={stats.kellyPct>0?C.mint:C.coral}
+          sub={stats.kellyPct>0 ? `Half-Kelly ≈ ${fmt(stats.kellyPct/2,1)}%` : "Edge ติดลบ"} Icon={Icons.BookOpen} />
+      </div>
+
+      <div className="compliance-row" style={{ display:"grid", gridTemplateColumns:"minmax(220px, 300px) 1fr", gap:16 }}>
+        <Panel title="Discipline Compliance">
+          <div style={{ display:"flex", justifyContent:"center", paddingTop:4 }}>
+            <ComplianceGauge value={stats.disciplineScore} count={stats.disciplineCount} />
+          </div>
+        </Panel>
+        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+          <StatCard label="Max Win Streak" value={`${stats.maxWinStreak}`} color={C.mint} Icon={Icons.TrendingUp} />
+          <StatCard label="Max Loss Streak" value={`${stats.maxLossStreak}`} color={C.coral} Icon={Icons.TrendingDown} />
+          <StatCard label="Risk of Ruin (ประมาณ)" value={stats.riskOfRuinPct===null ? "—" : `${fmt(stats.riskOfRuinPct,1)}%`}
+            color={stats.riskOfRuinPct===null ? C.text : stats.riskOfRuinPct<5?C.mint:stats.riskOfRuinPct<25?C.amber:C.coral}
+            sub={stats.avgRiskPercent ? `เฉลี่ยเสี่ยง ${fmt(stats.avgRiskPercent,2)}%/ไม้` : "ยังไม่มีข้อมูล % ความเสี่ยง"} Icon={Icons.AlertCircle} />
+        </div>
+      </div>
+
+      <Panel title={`Rolling Win Rate (ล่าสุด ${stats.rollingWindow} ไม้)`}>
+        <RollingLineChart data={stats.rollingWinRate} />
+      </Panel>
+
+      <Panel title="จัดอันดับ Setup (คะแนนความน่าจะเป็น)">
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {stats.setupRanking.map(s => (
+            <div key={s.name} className="glass-soft" style={{ display:"flex", alignItems:"center", gap:14, padding:"8px 10px" }}>
+              <ScoreDial score={s.score} size={44} />
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:14, fontWeight:600 }}>{s.name}</div>
+                <div style={{ fontSize:11.5, color:C.muted, fontFamily:"'JetBrains Mono', monospace" }}>
+                  n={s.n} · WR {fmt(s.winRate,0)}% · Exp {s.expectancy>=0?"+":""}{fmt(s.expectancy,2)}R
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <div className="quad-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        <Panel title="วิเคราะห์ตาม Session">
+          <RadialStatGrid data={stats.sessionRanking} />
+        </Panel>
+        <Panel title="กระจายตัวของ RR">
+          <SimpleBarChart data={stats.buckets} valueKey="count" labelKey="label" colorFn={(d)=>d.max<=0?C.brick:C.cyanNeon} />
+        </Panel>
+        <Panel title="วิเคราะห์ตามวันในสัปดาห์">
+          <RadialStatGrid data={stats.weekdayRanking} />
+        </Panel>
+        <Panel title="วิเคราะห์ตามช่วงเวลา">
+          <RadialStatGrid data={stats.hourRanking} />
+        </Panel>
+      </div>
+
+      <Panel title="Calendar Heatmap (กำไร-ขาดทุนรายวัน เป็น R)">
+        <CalendarHeatmap data={stats.calendarData} />
+      </Panel>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+        <StatCard label="Avg Win" value={`+${fmt(stats.avgWinR,2)}R`} color={C.mint} />
+        <StatCard label="Avg Loss" value={`${fmt(stats.avgLossR,2)}R`} color={C.coral} />
+      </div>
+    </div>
+  );
+}
+
+function Panel({ title, children }) {
+  return (
+    <div className="glass" style={{ padding:16 }}>
+      <div style={{ fontSize:12.5, color:C.muted, marginBottom:12, letterSpacing:"0.03em" }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+function StatCard({ label, value, color, sub, Icon }) {
+  return (
+    <div className="glass" style={{ padding:"14px 16px", display:"flex", alignItems:"center", gap:14 }}>
+      {Icon && (
+        <div className="icon-badge" style={{ flexShrink:0 }}>
+          <Icon size={19} color={C.text} />
+        </div>
+      )}
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:10.5, color:C.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</div>
+        <div style={{ fontFamily:"'JetBrains Mono', monospace", fontSize:22, fontWeight:700, color, marginTop:3, textShadow:`0 0 18px ${color}44` }}>{value}</div>
+        {sub && <div style={{ fontSize:10.5, color:C.muted, marginTop:3 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
