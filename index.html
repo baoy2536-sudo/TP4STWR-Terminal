@@ -4,6 +4,16 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ledger &amp; Edge — Trading Journal</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#050810" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Ledger & Edge" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -1327,6 +1337,15 @@ function App({ user }) {
           <div style={{ display:"flex", alignItems:"baseline", gap:10, flexWrap:"wrap" }}>
             <h1 style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:26, margin:0, letterSpacing:"-0.01em" }}>Ledger &amp; Edge</h1>
             <span style={{ fontSize:12, color:C.muted, fontFamily:"'JetBrains Mono', monospace" }}>trading journal · quant engine</span>
+            <span style={{
+              fontSize:15, fontFamily:"'JetBrains Mono', monospace", color:C.cyanNeon,
+              background:"rgba(55,211,224,0.12)", border:`1px solid ${C.cyanNeon}55`,
+              borderRadius:22, padding:"6px 16px", display:"flex", alignItems:"center", gap:9
+            }}>
+              <span style={{ fontWeight:700, fontSize:16 }}>Theerarat Paksa</span>
+              <span style={{ opacity:0.5 }}>|</span>
+              <span style={{ fontWeight:600 }}>4S &amp; TWR</span>
+            </span>
             <div style={{ marginLeft:"auto", display:"flex", gap:8, alignItems:"center" }}>
               <span style={{ fontSize:11, color:C.muted, fontFamily:"'JetBrains Mono', monospace" }}>{user.email}</span>
               <button onClick={()=>setShowSettings(true)} title="ตั้งค่าพอร์ตและวินัยความเสี่ยง" className="chip-btn">
@@ -1962,6 +1981,15 @@ function Root() {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<Root />);
+</script>
+
+<script>
+  // PWA: register service worker (silently no-ops if unsupported, e.g. file:// or old browsers)
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.warn("SW register failed:", err));
+    });
+  }
 </script>
 </body>
 </html>
