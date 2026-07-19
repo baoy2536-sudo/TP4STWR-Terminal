@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
     --bg:#050810; --bgVia:#070B18;
@@ -230,6 +231,7 @@ const Icons = {
   Settings: (p) => <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></Icon>,
   Lock: (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>,
   Wallet: (p) => <Icon {...p}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></Icon>,
+  LogOut: (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><path d="M21 12H9"/></Icon>,
 };
 
 // ---------- decorative rotating wireframe globe (hero graphic) ----------
@@ -464,6 +466,7 @@ const initialForm = {
   riskPercent: "", checklist: { plan: false, sl: false, size: false, matchesSetup: false, noImpulse: false },
   newsDuringTrade: "No", slippageR: "", durationMinutes: "",
   lotSize: "", slPips: "", pointValue: "",
+  mfeR: "", maeR: "", slHitThenRanToTP: "",
 };
 
 // ---------- rough point-value estimates (USD per 1 pip/point, per 1.00 standard lot) ----------
@@ -569,16 +572,17 @@ function todayStr() {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 }
 
-// ---------- local persistence (plain localStorage — this file runs standalone) ----------
-const store = {
-  get(key) {
-    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch (e) { return null; }
-  },
-  set(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
-  },
-  remove(key) { try { localStorage.removeItem(key); } catch (e) {} },
-};
+// ---------- Supabase (คลาวด์ — ข้อมูลตามไปทุกเครื่องที่ login) ----------
+const SUPABASE_URL = "https://tahkxgzicurozptyvywy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_KOxt_9p1X6zsJNhIBLlWGQ_HZH3Rh9e";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function newId() {
+  return (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+}
+function isValidUuid(v) {
+  return typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
 
 // ---------- ui atoms ----------
 function Field({ label, children, span }) {
@@ -1020,7 +1024,7 @@ function LimitBanner({ limitInfo, overrideChecked, setOverrideChecked }) {
 }
 
 // ---------- main app ----------
-function App() {
+function App({ user }) {
   const [trades, setTrades] = useState([]);
   const [tab, setTab] = useState("log");
   const [form, setForm] = useState(() => {
@@ -1038,23 +1042,27 @@ function App() {
   const [overrideChecked, setOverrideChecked] = useState(false);
   const importRef = useRef(null);
 
+  const [cloudError, setCloudError] = useState("");
+
   useEffect(() => { loadTrades(); loadSettings(); }, []);
 
-  function loadTrades() {
-    const ids = store.get("lm-trade-ids") || [];
-    const list = [];
-    ids.forEach((id) => { const t = store.get(`lm-trade:${id}`); if (t) list.push(t); });
+  async function loadTrades() {
+    const { data, error } = await sb.from("trades").select("id, data").eq("user_id", user.id);
+    if (error) { setCloudError("โหลดข้อมูลเทรดไม่สำเร็จ: " + error.message); return; }
+    const list = (data || []).map(row => ({ ...row.data, id: row.id }));
     list.sort((a,b) => new Date(b.datetime) - new Date(a.datetime));
     setTrades(list);
   }
 
-  function loadSettings() {
-    const s = store.get("lm-settings");
-    if (s) setSettings({ ...initialSettings, ...s });
+  async function loadSettings() {
+    const { data, error } = await sb.from("settings").select("data").eq("user_id", user.id).maybeSingle();
+    if (error) { setCloudError("โหลดการตั้งค่าไม่สำเร็จ: " + error.message); return; }
+    if (data && data.data) setSettings({ ...initialSettings, ...data.data });
   }
-  function saveSettings(s) {
+  async function saveSettings(s) {
     setSettings(s);
-    store.set("lm-settings", s);
+    const { error } = await sb.from("settings").upsert({ user_id: user.id, data: s, updated_at: new Date().toISOString() });
+    if (error) setCloudError("บันทึกการตั้งค่าไม่สำเร็จ: " + error.message);
     setShowSettings(false);
   }
 
@@ -1113,7 +1121,7 @@ function App() {
 
   const isLocked = limitInfo.breached && !overrideChecked && !editingId;
 
-  function saveTrade() {
+  async function saveTrade() {
     if (!form.symbol.trim() || !form.datetime || form.rMultiple === "") {
       setError("กรอกให้ครบ: สัญลักษณ์, วันที่/เวลา และ R-Multiple");
       return;
@@ -1123,25 +1131,19 @@ function App() {
       return;
     }
     setError("");
-    const id = editingId || `t${Date.now()}`;
+    const id = editingId || newId();
     const tradeObj = { ...form, id, symbol: form.symbol.trim().toUpperCase(), rMultiple: parseFloat(form.rMultiple), imgBefore: imgBefore || null, imgAfter: imgAfter || null };
-    const ok = store.set(`lm-trade:${id}`, tradeObj);
-    if (!ok) { setError("บันทึกไม่สำเร็จ รูปอาจใหญ่เกินไปสำหรับพื้นที่เก็บของเบราว์เซอร์ ลองใช้รูปที่เล็กลง"); return; }
-    if (!editingId) {
-      const ids = store.get("lm-trade-ids") || [];
-      ids.push(id);
-      store.set("lm-trade-ids", ids);
-    }
-    loadTrades();
+    const { error } = await sb.from("trades").upsert({ id, user_id: user.id, data: tradeObj });
+    if (error) { setError("บันทึกไม่สำเร็จ: " + error.message); return; }
+    await loadTrades();
     resetForm();
     setTab("list");
   }
 
-  function deleteTrade(id) {
-    store.remove(`lm-trade:${id}`);
-    const ids = (store.get("lm-trade-ids") || []).filter(x => x !== id);
-    store.set("lm-trade-ids", ids);
-    loadTrades();
+  async function deleteTrade(id) {
+    const { error } = await sb.from("trades").delete().eq("id", id).eq("user_id", user.id);
+    if (error) { setCloudError("ลบไม่สำเร็จ: " + error.message); return; }
+    await loadTrades();
   }
 
   function editTrade(t) {
@@ -1161,23 +1163,22 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
-  function importData(e) {
+  async function importData(e) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const arr = JSON.parse(ev.target.result);
         if (!Array.isArray(arr)) throw new Error("bad format");
-        const ids = store.get("lm-trade-ids") || [];
-        arr.forEach((t) => {
-          if (!t.id) t.id = `t${Date.now()}${Math.random().toString(36).slice(2,6)}`;
-          store.set(`lm-trade:${t.id}`, t);
-          if (!ids.includes(t.id)) ids.push(t.id);
+        const rows = arr.map((t) => {
+          const id = isValidUuid(t.id) ? t.id : newId();
+          return { id, user_id: user.id, data: { ...t, id } };
         });
-        store.set("lm-trade-ids", ids);
-        loadTrades();
-      } catch (err) { alert("ไฟล์ไม่ถูกต้อง"); }
+        const { error } = await sb.from("trades").upsert(rows);
+        if (error) throw error;
+        await loadTrades();
+      } catch (err) { alert("ไฟล์ไม่ถูกต้อง หรือนำเข้าไม่สำเร็จ: " + (err.message||"")); }
     };
     reader.readAsText(file);
   }
@@ -1290,12 +1291,29 @@ function App() {
     });
     const calendarData = Object.entries(dayMap).map(([date, r]) => ({ date, r })).sort((a,b) => a.date.localeCompare(b.date));
 
+    const mfeVals = trades.map(t => parseFloat(t.mfeR)).filter(v => !Number.isNaN(v));
+    const maeVals = trades.map(t => parseFloat(t.maeR)).filter(v => !Number.isNaN(v));
+    const avgMFE = mfeVals.length ? mean(mfeVals) : null;
+    const avgMAE = maeVals.length ? mean(maeVals) : null;
+    const efficiencyTrades = trades.filter(t => {
+      const m = parseFloat(t.mfeR);
+      return !Number.isNaN(m) && m > 0;
+    });
+    const avgEfficiency = efficiencyTrades.length
+      ? mean(efficiencyTrades.map(t => (t.rMultiple / parseFloat(t.mfeR)) * 100))
+      : null;
+
+    const lossTradesWithFlag = trades.filter(t => t.result === "Loss" && t.slHitThenRanToTP);
+    const slTooTightCount = trades.filter(t => t.result === "Loss" && t.slHitThenRanToTP === "Yes").length;
+    const slTooTightPct = lossTradesWithFlag.length ? (slTooTightCount / lossTradesWithFlag.length) * 100 : null;
+
     return {
       wins, losses, be, total, winRate, avgR, avgWinR, avgLossR, equity, maxDD,
       setupRanking: groupBy("setup"), sessionRanking: groupBy("session"), buckets, chron,
       profitFactor, sd, sharpe, sortino, kellyPct, disciplineScore, disciplineCount: withChecklist.length,
       rollingWinRate, rollingWindow, weekdayRanking, hourRanking, maxWinStreak, maxLossStreak,
-      avgRiskPercent, riskOfRuinPct, calendarData,
+      avgRiskPercent, riskOfRuinPct, calendarData, avgMFE, avgMAE, avgEfficiency, efficiencyCount: efficiencyTrades.length,
+      slTooTightCount, slTooTightPct, slFlagCount: lossTradesWithFlag.length,
     };
   }, [trades]);
 
@@ -1309,7 +1327,8 @@ function App() {
           <div style={{ display:"flex", alignItems:"baseline", gap:10, flexWrap:"wrap" }}>
             <h1 style={{ fontFamily:"'Fraunces', serif", fontWeight:600, fontSize:26, margin:0, letterSpacing:"-0.01em" }}>Ledger &amp; Edge</h1>
             <span style={{ fontSize:12, color:C.muted, fontFamily:"'JetBrains Mono', monospace" }}>trading journal · quant engine</span>
-            <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+            <div style={{ marginLeft:"auto", display:"flex", gap:8, alignItems:"center" }}>
+              <span style={{ fontSize:11, color:C.muted, fontFamily:"'JetBrains Mono', monospace" }}>{user.email}</span>
               <button onClick={()=>setShowSettings(true)} title="ตั้งค่าพอร์ตและวินัยความเสี่ยง" className="chip-btn">
                 <Icons.Settings size={13}/> ตั้งค่า
               </button>
@@ -1320,8 +1339,17 @@ function App() {
               <button onClick={()=>importRef.current.click()} title="นำเข้าไฟล์สำรอง" className="chip-btn">
                 <Icons.Upload size={13}/> นำเข้า
               </button>
+              <button onClick={()=>sb.auth.signOut()} title="ออกจากระบบ" className="chip-btn">
+                <Icons.LogOut size={13}/> ออกจากระบบ
+              </button>
             </div>
           </div>
+
+          {cloudError && (
+            <div style={{ marginTop:10, padding:"8px 12px", borderRadius:8, background:"rgba(255,90,90,0.12)", border:`1px solid ${C.coral}55`, fontSize:12, color:C.coral }}>
+              ⚠ {cloudError}
+            </div>
+          )}
 
           {/* account balance strip */}
           <div style={{ display:"flex", alignItems:"center", gap:18, marginTop:14, flexWrap:"wrap" }}>
@@ -1412,6 +1440,12 @@ function LogForm({ form, setForm, imgBefore, imgAfter, handleImage, setImgBefore
   const dollarRisk = hasLotCalc ? lot * slPips * ptVal : null;
   const calcRiskPercent = hasLotCalc && currentBalance > 0 ? (dollarRisk / currentBalance) * 100 : null;
 
+  const rNum = parseFloat(form.rMultiple);
+  const mfeNum = parseFloat(form.mfeR);
+  const maeNum = parseFloat(form.maeR);
+  const hasEfficiency = !Number.isNaN(rNum) && !Number.isNaN(mfeNum) && mfeNum > 0;
+  const efficiencyPct = hasEfficiency ? (rNum / mfeNum) * 100 : null;
+
   function applyCalcRisk() {
     if (calcRiskPercent !== null) upd("riskPercent", calcRiskPercent.toFixed(2));
   }
@@ -1471,6 +1505,44 @@ function LogForm({ form, setForm, imgBefore, imgAfter, handleImage, setImgBefore
         </Field>
         <Field label="R-Multiple ผลลัพธ์ (เช่น 2 = +2R, -1 = -1R)">
           <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="0.0" value={form.rMultiple} onChange={(e)=>upd("rMultiple", e.target.value)} />
+        </Field>
+        <Field label="MFE — กำไรสูงสุดที่ไม้เคยวิ่งไปทางถูกทาง (R)">
+          <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น 3.0" value={form.mfeR} onChange={(e)=>upd("mfeR", e.target.value)} />
+        </Field>
+        <Field label="MAE — ขาดทุนสูงสุดที่ไม้เคยติดลบก่อนปิด (R, ใส่ค่าลบ)">
+          <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น -0.8" value={form.maeR} onChange={(e)=>upd("maeR", e.target.value)} />
+        </Field>
+
+        {form.result === "Loss" && (
+          <Field label="หลังโดน SL ราคาวิ่งต่อไปทาง TP ตามแผนไหม (เช็ค SL แคบไปหรือเปล่า)" span>
+            <div style={{ display:"flex", gap:8 }}>
+              {["No","Yes"].map(v => (
+                <button key={v} type="button" onClick={()=>upd("slHitThenRanToTP", v)}
+                  className={`toggle-btn ${form.slHitThenRanToTP===v ? (v==="Yes"?"on-amber":"on-mint") : ""}`}>
+                  {v==="Yes" ? "ใช่ — วิ่งต่อไปทาง TP" : "ไม่ — ไปคนละทาง/กลับตัวจริง"}
+                </button>
+              ))}
+            </div>
+            {form.slHitThenRanToTP==="Yes" && (
+              <div style={{ marginTop:8, fontSize:12, color:C.amber }}>
+                ⚠ สัญญาณว่า SL อาจแคบไปสำหรับ setup นี้ — เก็บไว้ทบทวนตอนอัปเดต SOP รอบถัดไป (ไม่ใช่ขยับ SL ระหว่างถือไม้ที่เปิดอยู่ ยึดกฎเหล็กเดิมต่อไป)
+              </div>
+            )}
+          </Field>
+        )}
+        <Field label="ประสิทธิภาพการปิดไม้ (คำนวณจาก R-Multiple ÷ MFE)" span>
+          <div className="glass-soft" style={{ padding:"12px 14px", fontSize:12.5 }}>
+            {hasEfficiency ? (
+              <div>
+                จับกำไรได้ <b style={{ fontFamily:"'JetBrains Mono', monospace", color: efficiencyPct>=70?C.mint:efficiencyPct>=35?C.amber:C.coral }}>
+                  {fmt(efficiencyPct,0)}%
+                </b> ของโอกาสที่มี (TP ที่ตั้งไว้ได้ {fmt(rNum,1)}R จากที่ราคาวิ่งได้ถึง {fmt(mfeNum,1)}R)
+                {efficiencyPct < 40 && <div style={{ color:C.muted, marginTop:4 }}>ต่ำกว่า 40% — ไม่ใช่ปัญหาวินัย (คุณทำตามระบบเป๊ะอยู่แล้ว) แต่เป็นสัญญาณว่า TP ที่ตั้งไว้อาจอนุรักษ์นิยมไปสำหรับ setup นี้ เก็บไว้ทบทวนตอนอัปเดต SOP รอบถัดไป</div>}
+              </div>
+            ) : (
+              <div style={{ color:C.muted }}>กรอก R-Multiple และ MFE ให้ครบ ระบบจะคำนวณ % ประสิทธิภาพการปิดไม้ให้อัตโนมัติ</div>
+            )}
+          </div>
         </Field>
         <Field label="ความเสี่ยงต่อไม้ (% ของพอร์ต)">
           <input type="number" step="0.1" className="field-input" style={{ fontFamily:"'JetBrains Mono', monospace" }} placeholder="เช่น 1.0" value={form.riskPercent} onChange={(e)=>upd("riskPercent", e.target.value)} />
@@ -1606,6 +1678,19 @@ function TradeList({ trades, expanded, setExpanded, editTrade, deleteTrade, setL
                   <div><span style={{ color:C.muted }}>อารมณ์: </span>{t.emotion || "—"}</div>
                   <div><span style={{ color:C.muted }}>ผลลัพธ์: </span>{t.result}</div>
                   <div><span style={{ color:C.muted }}>ความเสี่ยง: </span>{t.riskPercent ? `${t.riskPercent}%` : "—"}</div>
+                  <div><span style={{ color:C.muted }}>MFE / MAE: </span>
+                    {t.mfeR ? <span style={{ color:C.mint }}>+{fmt(parseFloat(t.mfeR),1)}R</span> : "—"}
+                    {" / "}
+                    {t.maeR ? <span style={{ color:C.coral }}>{fmt(parseFloat(t.maeR),1)}R</span> : "—"}
+                  </div>
+                  {t.result === "Loss" && t.slHitThenRanToTP && (
+                    <div style={{ gridColumn:"span 2" }}>
+                      <span style={{ color:C.muted }}>โดน SL แล้ววิ่งต่อไปทาง TP: </span>
+                      <span style={{ color: t.slHitThenRanToTP==="Yes" ? C.amber : C.text }}>
+                        {t.slHitThenRanToTP==="Yes" ? "ใช่ ⚠ SL อาจแคบไป" : "ไม่ใช่"}
+                      </span>
+                    </div>
+                  )}
                   <div><span style={{ color:C.muted }}>ระยะเวลาถือ: </span>{t.durationMinutes ? `${t.durationMinutes} นาที (${holdTypeOf(t.durationMinutes)})` : "—"}</div>
                   <div><span style={{ color:C.muted }}>Slippage: </span>{t.slippageR ? `${t.slippageR}R` : "—"}</div>
                   <div><span style={{ color:C.muted }}>ข่าวระหว่างถือ: </span>{t.newsDuringTrade === "Yes" ? "มี" : "ไม่มี"}</div>
@@ -1752,6 +1837,24 @@ function QuantEngine({ stats, moneyStats, settings }) {
         <StatCard label="Avg Win" value={`+${fmt(stats.avgWinR,2)}R`} color={C.mint} />
         <StatCard label="Avg Loss" value={`${fmt(stats.avgLossR,2)}R`} color={C.coral} />
       </div>
+
+      <div className="stat-row" style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:10 }}>
+        <StatCard label="Avg MFE" value={stats.avgMFE===null ? "—" : `+${fmt(stats.avgMFE,2)}R`} color={C.mint}
+          sub="โอกาสกำไรสูงสุดเฉลี่ยที่มี" Icon={Icons.TrendingUp} />
+        <StatCard label="Avg MAE" value={stats.avgMAE===null ? "—" : `${fmt(stats.avgMAE,2)}R`} color={C.coral}
+          sub="ขาดทุนลึกสุดเฉลี่ยก่อนปิด" Icon={Icons.TrendingDown} />
+        <StatCard label="Trade Efficiency" value={stats.avgEfficiency===null ? "—" : `${fmt(stats.avgEfficiency,0)}%`}
+          color={stats.avgEfficiency>=70?C.mint:stats.avgEfficiency>=35?C.amber:C.coral}
+          sub={stats.efficiencyCount ? `จับกำไรเฉลี่ยจาก ${stats.efficiencyCount} ไม้ที่มี MFE` : "ยังไม่มีข้อมูล MFE"} Icon={Icons.Activity} />
+      </div>
+
+      <div className="stat-row" style={{ display:"grid", gridTemplateColumns:"1fr", gap:10 }}>
+        <StatCard label="SL แคบไป (โดน SL แล้ววิ่งต่อไปทาง TP)"
+          value={stats.slTooTightPct===null ? "—" : `${fmt(stats.slTooTightPct,0)}%`}
+          color={stats.slTooTightPct>=40?C.coral:stats.slTooTightPct>=15?C.amber:C.mint}
+          sub={stats.slFlagCount ? `${stats.slTooTightCount} จาก ${stats.slFlagCount} ไม้ที่ Loss และมีข้อมูลนี้ — ถ้าเปอร์เซ็นต์สูง ควรพิจารณาขยาย SL ในรอบทบทวน SOP ถัดไป` : "ยังไม่มีข้อมูล — ตอบคำถามนี้เมื่อบันทึกไม้ที่ Loss"}
+          Icon={Icons.AlertTriangle} />
+      </div>
     </div>
   );
 }
@@ -1781,8 +1884,84 @@ function StatCard({ label, value, color, sub, Icon }) {
   );
 }
 
+// ---------- login screen ----------
+function LoginScreen() {
+  const [mode, setMode] = useState("signin"); // signin | signup
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    setMsg(""); setBusy(true);
+    try {
+      if (mode === "signin") {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        const { error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        setMsg("สมัครสำเร็จ! เช็คอีเมลเพื่อยืนยันตัวตน (ถ้าโปรเจกต์เปิด email confirmation ไว้) แล้วกลับมา Sign in");
+      }
+    } catch (err) {
+      setMsg(err.message || "เกิดข้อผิดพลาด");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <form onSubmit={submit} className="glass" style={{ width:"100%", maxWidth:380, padding:28 }}>
+        <div style={{ fontFamily:"'Fraunces', serif", fontSize:24, fontWeight:600, marginBottom:4 }}>Ledger &amp; Edge</div>
+        <div style={{ fontSize:12.5, color:C.muted, marginBottom:22 }}>
+          {mode === "signin" ? "เข้าสู่ระบบเพื่อดูข้อมูลเทรดของคุณจากทุกเครื่อง" : "สมัครสมาชิกใหม่"}
+        </div>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <input type="email" required placeholder="อีเมล" value={email} onChange={(e)=>setEmail(e.target.value)}
+            style={inputStyle} autoComplete="username" />
+          <input type="password" required placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" value={password} onChange={(e)=>setPassword(e.target.value)}
+            style={inputStyle} autoComplete={mode==="signin"?"current-password":"new-password"} minLength={6} />
+        </div>
+
+        {msg && <div style={{ marginTop:12, fontSize:12.5, color: msg.includes("สำเร็จ") ? C.mint : C.coral }}>{msg}</div>}
+
+        <button type="submit" disabled={busy} className="btn-primary" style={{ width:"100%", marginTop:18, padding:"11px 0", justifyContent:"center" }}>
+          {busy ? "กำลังดำเนินการ..." : mode === "signin" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+        </button>
+
+        <div style={{ textAlign:"center", marginTop:16, fontSize:12.5, color:C.muted }}>
+          {mode === "signin" ? (
+            <span>ยังไม่มีบัญชี? <a href="#" onClick={(e)=>{e.preventDefault(); setMode("signup"); setMsg("");}} style={{ color:C.cyanNeon }}>สมัครที่นี่</a></span>
+          ) : (
+            <span>มีบัญชีแล้ว? <a href="#" onClick={(e)=>{e.preventDefault(); setMode("signin"); setMsg("");}} style={{ color:C.cyanNeon }}>เข้าสู่ระบบ</a></span>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function Root() {
+  const [session, setSession] = useState(undefined); // undefined = loading, null = no session
+
+  useEffect(() => {
+    sb.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = sb.auth.onAuthStateChange((_event, sess) => setSession(sess));
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) {
+    return <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", color:C.muted }}>กำลังโหลด...</div>;
+  }
+  if (!session) return <LoginScreen />;
+  return <App user={session.user} />;
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+root.render(<Root />);
 </script>
 </body>
 </html>
